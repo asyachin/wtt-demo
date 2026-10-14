@@ -123,3 +123,12 @@ desktop.ini
 *.rej
 ns.tmp
 scratch/
+
+# Terraform local data and state
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+**/crash.log
+**/crash.*.log
+**/*.tfvars.json
