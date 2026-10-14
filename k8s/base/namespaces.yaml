@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vote-dev
+  labels:
+    app.kubernetes.io/part-of: wtt-demo
+    environment: dev
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vote-prod
+  labels:
+    app.kubernetes.io/part-of: wtt-demo
+    environment: prod
