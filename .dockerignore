@@ -1,0 +1,74 @@
+# Repository root build context.
+#
+# No image in this project is built from the repository root. Every service has its
+# own context: app/vote, app/result and app/worker, each with its own .dockerignore.
+# This file exists as a safety net, so that an accidental "docker build ." never
+# sends secrets, Terraform state or a kubeconfig into a build.
+#
+# Docker reads only the .dockerignore that sits in the context directory. Rules here
+# do not apply to app/vote, app/result or app/worker.
+
+# Version control
+.git
+.gitignore
+.gitattributes
+.github
+
+# Secrets and environment files
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Infrastructure state and access
+infra
+**/.terraform
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+kubeconfig
+*.kubeconfig
+.kube
+
+# Not needed by any application image
+docs
+deploy
+tests
+scripts
+*.md
+LICENSE
+Makefile
+pyproject.toml
+
+# Dependencies and build output
+**/node_modules
+**/__pycache__
+**/*.py[cod]
+**/.venv
+**/bin
+**/obj
+
+# Tool caches and reports
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/.trivycache
+**/*.sarif
+**/.coverage
+**/htmlcov
+
+# Editors and operating system
+.idea
+.vscode
+**/.DS_Store
+**/Thumbs.db
+
+# Scratch files
+*.tmp
+*.bak
+*.orig
+ns.tmp

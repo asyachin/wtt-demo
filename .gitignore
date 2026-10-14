@@ -1,0 +1,125 @@
+# Secrets and environment files
+# Everything matching .env.* is ignored, with one exception: the committed template.
+# app/.env, app/.env.dev and app/.env.prod are symlinks into ~/.secrets and must never
+# be tracked. app/.env itself must not exist at all; see docs/arch/application.md D8.
+.env
+.env.*
+!.env.template
+*.tfvars.json
+*secret*.tfvars
+*secrets*.tfvars
+*.auto.tfvars
+
+# Credentials and keys
+*.pem
+*.key
+*.p12
+*.pfx
+cosign.key
+cosign.pub
+id_rsa*
+id_ed25519*
+
+# Kubernetes access
+kubeconfig
+kubeconfig-*
+*.kubeconfig
+.kube/
+
+# Terraform
+# The provider lock file .terraform.lock.hcl is committed on purpose, so that every
+# apply resolves the same provider versions. It is not listed here.
+.terraform/
+.terraform.tfstate.lock.info
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Helm
+# Chart.lock is committed when the chart has dependencies. Downloaded charts are not.
+deploy/helm/*/charts/
+*.tgz
+
+# Python
+# A bare "env/" is deliberately not listed here. It would also match
+# infra/terraform/env/, which holds every Terraform root module.
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.egg-info/
+# Anchored to the repository root, so that a directory named build or dist deeper in
+# the tree is not ignored by accident.
+/dist/
+/build/
+
+# Node, for the result service
+node_modules/
+npm-debug.log*
+.npm/
+.eslintcache
+
+# .NET, for the worker service
+# Scoped to the one project that exists, so that a directory named bin or obj
+# elsewhere in the repository is not ignored by accident.
+app/worker/bin/
+app/worker/obj/
+*.user
+*.suo
+TestResults/
+
+# Security and scan output
+# Reports are uploaded to the GitHub security tab, not committed.
+trivy-*.json
+trivy-*.sarif
+*.sarif
+.trivycache/
+gitleaks-report.json
+checkov-report.*
+
+# Test and tool artifacts
+.hypothesis/
+test-results/
+*.log
+
+# Editors and tooling
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.history/
+
+# Operating system
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
+
+# Scratch files
+# ns.tmp was a copy of the Route 53 record set pasted into the repository. Record
+# details belong in the Route 53 console, not in Git.
+*.tmp
+*.bak
+*.orig
+*.rej
+ns.tmp
+scratch/
