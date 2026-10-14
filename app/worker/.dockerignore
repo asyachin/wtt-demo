@@ -1,0 +1,19 @@
+# Build context: app/worker
+#
+# An allow-list, not a deny-list. The previous version of this file excluded bin/ and
+# obj/ by name, which was correct but incomplete: obj/ was still committed to Git and
+# still carried another developer's absolute paths and an unrelated commit hash. See
+# docs/arch/application.md, defect D7.
+#
+# Excluding obj/ here also matters for correctness, not only for size. A stale
+# obj/project.assets.json in the context makes "dotnet restore" resolve against a
+# cache that does not exist in the build stage, which fails in a confusing way.
+#
+# Maintenance rule: a new file or directory that the image needs must be added here
+# in the same commit.
+
+*
+
+!Dockerfile
+!Worker.csproj
+!Program.cs

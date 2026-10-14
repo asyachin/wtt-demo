@@ -1,0 +1,36 @@
+# Build context: app/
+#
+# No image is normally built from this directory either. It exists because the three
+# environment files live here, two of them symlinks into ~/.secrets, and a build with
+# "docker build app/" would otherwise send them into the image layer cache.
+#
+# The database migration service in docker-compose.yml is the one case that may use
+# this context, because it needs app/db/migrations. That path is deliberately not
+# excluded.
+
+# Environment files. These are the highest-risk files in the repository.
+.env
+.env.*
+!.env.template
+
+# Service contexts are built on their own, with their own .dockerignore
+vote
+result
+worker
+
+# Local orchestration, not needed inside an image
+docker-compose.yml
+docker-compose.*.yml
+
+# Dependencies and build output
+**/node_modules
+**/__pycache__
+**/*.py[cod]
+**/bin
+**/obj
+
+# Documentation and editors
+*.md
+.idea
+.vscode
+**/.DS_Store

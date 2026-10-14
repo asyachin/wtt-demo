@@ -1,0 +1,20 @@
+# Build context: app/result
+#
+# An allow-list, not a deny-list. Everything is excluded first, then the few files
+# the image actually needs are added back. A deny-list silently ships anything nobody
+# thought to exclude; an allow-list fails visibly instead.
+#
+# package-lock.json is required: the build runs "npm ci", which refuses to run
+# without it. views/ holds index.html, the stylesheet and the two vendored client
+# libraries, angular.min.js and socket.io.js.
+#
+# Maintenance rule: a new file or directory that the image needs must be added here
+# in the same commit.
+
+*
+
+!Dockerfile
+!package.json
+!package-lock.json
+!server.js
+!views

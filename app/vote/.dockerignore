@@ -1,0 +1,20 @@
+# Build context: app/vote
+#
+# This file did not exist before, which is why the Dockerfile's "COPY . ." copied
+# whatever happened to be in the directory. See docs/arch/application.md, defect D7.
+#
+# This is an allow-list, not a deny-list. Everything is excluded first, then the few
+# files the image actually needs are added back. A deny-list silently ships anything
+# nobody thought to exclude; an allow-list fails visibly instead.
+#
+# Maintenance rule: a new file or directory that the image needs must be added here
+# in the same commit. The symptom of forgetting is an ImportError or a 404, not a
+# silent leak.
+
+*
+
+!Dockerfile
+!requirements.txt
+!app.py
+!static
+!templates
