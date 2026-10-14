@@ -1,13 +1,13 @@
-# Ironhack note - This file is for running in docker compose with prebuilt images
-# Use these if you're stuck, or if you want to start slowly migrating from external images into your own.
 
 services:
   vote:
     image: ${VOTE_IMAGE}
     build: ./vote
+    env_file:
+      - .env.dev
     depends_on:
       redis:
-        condition: service_healthy 
+        condition: service_healthy
     ports:
       - "${VOTE_PORT}:80"
     networks:
@@ -16,51 +16,78 @@ services:
   result:
     image: ${RESULT_IMAGE}
     build: ./result
+    env_file:
+      - .env.dev
+    environment:
+      PG_HOST: db
+      PG_PORT: "5432"
+      PG_USER: "${POSTGRES_USER}"
+      PG_PASSWORD: "${POSTGRES_PASSWORD}"
+      PG_DATABASE: "${POSTGRES_DB}"
     depends_on:
       db:
-        condition: service_healthy 
+        condition: service_healthy
     ports:
       - "${RESULT_PORT}:80"
     networks:
       - back-tier
 
   worker:
-    build: ./worker
     image: ${WORKER_IMAGE}
+    build: ./worker
+    env_file:
+      - .env.dev
+    environment:
+      DB_HOST: db
+      DB_USERNAME: "${POSTGRES_USER:?POSTGRES_USER is required}"
+      DB_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+      DB_NAME: "${POSTGRES_DB:?POSTGRES_DB is required}"
+      REDIS_HOST: redis
     depends_on:
       redis:
-        condition: service_healthy 
+        condition: service_healthy
       db:
-        condition: service_healthy 
+        condition: service_healthy
     networks:
       - back-tier
 
   redis:
-    image: redis:alpine
+    image: redis:7.4.11-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
     volumes:
-      - "./healthchecks:/healthchecks"
+      - redis-data:/data
+      - ./healthchecks:/healthchecks:ro
     healthcheck:
-      test: /healthchecks/redis.sh
-      interval: "5s"
+      test: ["CMD", "sh", "/healthchecks/redis.sh"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     networks:
       - back-tier
 
   db:
-    image: postgres:15-alpine
+    image: postgres:17.11-alpine
     environment:
       POSTGRES_USER: "${POSTGRES_USER}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: "${POSTGRES_DB}"
     volumes:
-      - "db-data:/var/lib/postgresql/data"
-      - "./healthchecks:/healthchecks"
+      - db-data:/var/lib/postgresql/data
+      - ./healthchecks:/healthchecks:ro
     healthcheck:
-      test: /healthchecks/postgres.sh
-      interval: "5s"
+      test: ["CMD", "bash", "/healthchecks/postgres.sh"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     networks:
       - back-tier
 
-volumes:
-  db-data:
-
 networks:
   back-tier:
+
+volumes:
+  db-data:
+  redis-data:
