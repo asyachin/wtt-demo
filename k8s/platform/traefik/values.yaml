@@ -1,0 +1,42 @@
+# Traefik Helm chart 41.7.1
+deployment:
+  replicas: 1
+
+service:
+  spec:
+    type: ClusterIP
+
+providers:
+  kubernetesGateway:
+    enabled: true
+  kubernetesIngress:
+    enabled: false
+  kubernetesCRD:
+    enabled: false
+
+gatewayClass:
+  enabled: true
+  name: traefik
+
+gateway:
+  enabled: true
+  name: traefik-gateway
+  listeners:
+    web:
+      port: 8000
+      protocol: HTTP
+      namespacePolicy:
+        from: All
+
+api:
+  dashboard: false
+
+log:
+  level: INFO
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
