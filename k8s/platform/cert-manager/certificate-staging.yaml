@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wtt-demo-staging
+  namespace: traefik
+spec:
+  secretName: wtt-demo-staging-tls
+  dnsNames:
+    - wtt-demo.syachin.de
+  issuerRef:
+    name: letsencrypt-staging
+    kind: ClusterIssuer

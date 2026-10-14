@@ -27,6 +27,15 @@ gateway:
       protocol: HTTP
       namespacePolicy:
         from: All
+    websecure:
+      port: 8443
+      protocol: HTTPS
+      hostname: wtt-demo.syachin.de
+      namespacePolicy:
+        from: All
+      certificateRefs:
+        - kind: Secret
+          name: wtt-demo-tls
 
 api:
   dashboard: false

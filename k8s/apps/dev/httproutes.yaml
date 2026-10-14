@@ -4,10 +4,15 @@ metadata:
   name: vote
   namespace: vote-dev
 spec:
+  hostnames:
+    - wtt-demo.syachin.de
   parentRefs:
     - name: traefik-gateway
       namespace: traefik
       sectionName: web
+    - name: traefik-gateway
+      namespace: traefik
+      sectionName: websecure
   rules:
     - matches:
         - path:
@@ -23,10 +28,15 @@ metadata:
   name: result
   namespace: vote-dev
 spec:
+  hostnames:
+    - wtt-demo.syachin.de
   parentRefs:
     - name: traefik-gateway
       namespace: traefik
       sectionName: web
+    - name: traefik-gateway
+      namespace: traefik
+      sectionName: websecure
   rules:
     - matches:
         - path:

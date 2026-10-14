@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wtt-demo
+  namespace: traefik
+spec:
+  secretName: wtt-demo-tls
+  dnsNames:
+    - wtt-demo.syachin.de
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
