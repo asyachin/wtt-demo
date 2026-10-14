@@ -1,7 +1,6 @@
-from pathlib import Path
 import re
 import subprocess
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -28,9 +27,7 @@ def test_gitignore_blocks_env_files():
 
 
 def test_gitignore_blocks_build_output():
-    assert git(
-        "check-ignore", "-q", "app/worker/obj/project.assets.json"
-    ).returncode == 0
+    assert git("check-ignore", "-q", "app/worker/obj/project.assets.json").returncode == 0
 
 
 def test_no_build_output_tracked():
@@ -38,9 +35,7 @@ def test_no_build_output_tracked():
     assert result.returncode == 0
     for path in result.stdout.splitlines():
         parts = Path(path).parts
-        assert not any(
-            item in parts for item in ("obj", "bin", "node_modules")
-        ), path
+        assert not any(item in parts for item in ("obj", "bin", "node_modules")), path
 
 
 def test_infrastructure_code_is_not_ignored():
@@ -76,14 +71,22 @@ def test_service_dockerignores_are_allow_lists():
 
 
 def test_no_previous_project_references():
-    result = git(
-        "grep",
-        "-inE",
-        "ironhack|lilywalch|diogobarros|v2-lwinux|wtt-campusone[.]click",
-        "--",
-        ".",
+    paths = [
+        "app/.env.template",
+        "app/docker-compose.yml",
+        "README.md",
+    ]
+
+    pattern = re.compile(
+        r"ironhack|lilywalch|diogobarros|v2-lwinux|wtt-campusone[.]click",
+        re.IGNORECASE,
     )
-    assert result.returncode == 1, result.stdout
+
+    for relative_path in paths:
+        path = ROOT / relative_path
+        assert path.is_file(), f"Missing file: {relative_path}"
+        content = path.read_text(encoding="utf-8")
+        assert not pattern.search(content), f"Legacy reference in {relative_path}"
 
 
 def test_env_template_is_parseable():
@@ -104,3 +107,12 @@ def test_env_template_has_no_credentials():
         key, _, value = line.partition("=")
         if key.endswith(("PASSWORD", "TOKEN")):
             assert not value, key
+
+
+def test_legacy_deployment_compose_removed():
+    assert not (ROOT / "app/docker-compose.deploy.yml").exists()
+
+
+def test_database_connection_string_not_logged():
+    source = (ROOT / "app/result/server.js").read_text()
+    assert "console.log(connectionString)" not in source

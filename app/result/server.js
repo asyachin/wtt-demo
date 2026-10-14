@@ -38,11 +38,15 @@ resultNamespace.on('connection', function (socket) {
 var pgHost = process.env.PG_HOST || 'db';
 var pgPort = process.env.PG_PORT || 5432;
 var pgUser = process.env.PG_USER || 'postgres';
-var pgPassword = process.env.PG_PASSWORD || 'postgres';
+var pgPassword = process.env.PG_PASSWORD;
+
+if (!pgPassword) {
+  throw new Error('PG_PASSWORD environment variable is required');
+}
 var pgDatabase = process.env.PG_DATABASE || 'postgres';
 
 var connectionString = `postgresql://${pgUser}:${pgPassword}@${pgHost}:${pgPort}/${pgDatabase}`;
-console.log(connectionString);
+console.log("PostgreSQL connection configured");
 
 var { Pool } = require('pg');
 var pool = new Pool({ connectionString: connectionString });
