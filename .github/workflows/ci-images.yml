@@ -1,0 +1,75 @@
+name: CI - Application Images
+
+on:
+  push:
+    branches:
+      - block/07-github-actions
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14.8'
+      - name: Install test dependencies
+        run: python -m pip install -r tests/requirements.txt
+      - name: Run tests
+        run: python -m pytest -q tests/unit
+
+  node-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/result/package-lock.json
+      - name: Install dependencies
+        working-directory: app/result
+        run: npm ci
+      - name: Check Node.js syntax
+        run: node --check app/result/server.js
+
+  dotnet-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build Worker
+        run: dotnet build app/worker/Worker.csproj -c Release
+
+  images:
+    needs: [python-tests, node-check, dotnet-check]
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [vote, result, worker]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish
+        uses: docker/build-push-action@v7
+        with:
+          context: ./app/${{ matrix.service }}
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/asyachin/wtt-demo/${{ matrix.service }}:${{ github.sha }}

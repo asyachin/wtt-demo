@@ -40,12 +40,15 @@ def test_no_build_output_tracked():
 
 def test_infrastructure_code_is_not_ignored():
     paths = [
-        "infra/terraform/env/platform/main.tf",
-        "infra/terraform/env/platform/terraform.tfvars",
-        "infra/terraform/env/platform/.terraform.lock.hcl",
-        "deploy/helm/wtt-vote/values-prod.yaml",
+        "infra/terraform/bootstrap/main.tf",
+        "infra/terraform/network/main.tf",
+        "infra/terraform/iam/main.tf",
+        "infra/terraform/eks/main.tf",
+        "k8s/apps/dev/applications.yaml",
+        "k8s/platform/argocd/values.yaml",
     ]
     for path in paths:
+        assert (ROOT / path).is_file(), f"Missing infrastructure file: {path}"
         assert git("check-ignore", "-q", path).returncode == 1, path
 
 
