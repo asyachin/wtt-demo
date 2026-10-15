@@ -65,7 +65,7 @@ spec:
     spec:
       containers:
         - name: result
-          image: ghcr.io/asyachin/wtt-demo/result:11b36e6249b62b5414e46eb21a467a7d9132e00c
+          image: ghcr.io/asyachin/wtt-demo/result:2026.10.15-1339-build.8-a1-a66f5f2
           imagePullPolicy: Always
           ports:
             - containerPort: 80
