@@ -123,7 +123,7 @@ Because the identity mechanism was simple, effort went into the policy instead. 
 
 A compromised cert-manager pod can create or delete one TXT record name in one zone. It cannot modify the `A` record that points at the demonstration, and it cannot read or write any other zone.
 
-Note the coupling this creates: changing the public hostname requires updating `infra/terraform/iam/cert-manager.tf` as well as the manifests, or issuance fails with `AccessDenied`. That is a correct denial being mistaken for a broken role, and it is called out in [../operations/troubleshoot.md](../operations/troubleshoot.md).
+Note the coupling this creates: changing the public hostname requires updating `infra/terraform/iam/cert-manager.tf` as well as the manifests, or issuance fails with `AccessDenied`. That is a correct denial being mistaken for a broken role, and it is called out in [../operations/operate.md](../operations/operate.md).
 
 ## Verification
 

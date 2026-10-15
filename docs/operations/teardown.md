@@ -173,6 +173,24 @@ This must return nothing. If a load balancer remains, delete it explicitly **by 
 
 Uninstalling Traefik also removes the `GatewayClass` and `Gateway` it created, so the public demonstration is down from this point.
 
+## Step 1a — Remove Argo CD and its applications
+
+Argo CD manages the application Deployments and Services with `selfHeal: true`. If it is left running while the next steps delete those objects by hand, it will recreate them. Remove Argo CD, or at least disable its sync, before deleting anything it watches.
+
+```bash
+# Read first: what is Argo CD currently managing
+kubectl -n argocd get applications
+
+kubectl delete -f k8s/platform/argocd/vote-dev-application.yaml --ignore-not-found
+kubectl delete -f k8s/platform/argocd/demo-application.yaml --ignore-not-found
+helm uninstall argocd -n argocd
+
+# The isolated proving workload, if it is still present
+kubectl delete namespace gitops-demo --ignore-not-found
+```
+
+Argo CD was never given a public route, so there is no load balancer to release here, only the controller and its two Applications.
+
 ## Step 2 — Remove the DNS record
 
 ```bash
@@ -195,7 +213,7 @@ echo "PVC=$PVC_NAME  PV=$PV_NAME  EBS=$EBS_VOL  reclaim=$RECLAIM"
 | Policy | Deleting the PVC |
 |---|---|
 | `Delete` — the current setting | The EBS volume is destroyed. **All voting data is lost, irreversibly.** |
-| `Retain` — after [Block 06](../blocks/06-data-durability.md) | The volume survives and **keeps billing** until deleted explicitly by ID |
+| `Retain` — after [Block 06](../roadmap.md#next-block) | The volume survives and **keeps billing** until deleted explicitly by ID |
 
 List what exists before deleting anything, and delete by name rather than with `--all`:
 
@@ -393,4 +411,4 @@ Follow [reproduce.md](reproduce.md). Two things will differ:
 - A new NLB hostname, which must be written into `infra/terraform/iam/dns-demo.tf`. It is hardcoded; see [../lessons.md](../lessons.md).
 - New subnet IDs, which must be written into `k8s/platform/traefik/values-public.yaml`.
 
-The `postgres-credentials` Secret must also be recreated by hand, and the voting data starts empty unless a dump from the pre-teardown step is restored.
+The `postgres-credentials` Secret must also be recreated by hand, and the voting data starts empty unless a dump from the pre-teardown step is restored. Argo CD and its Applications are reinstalled as in [reproduce.md](reproduce.md) step 12.

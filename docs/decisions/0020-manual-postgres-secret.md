@@ -49,7 +49,7 @@ ADR 0007's central principle is upheld: **no secret in Git, in a manifest, in a 
 
 **Rotation already has a script.** `scripts/rotate_k8s_postgres_password.py` changes the password inside PostgreSQL and updates the Secret together, which is the part that actually matters. Doing only one of the two produces a failure that looks like a network problem: the password inside `PGDATA` is authoritative, so a Secret-only change leaves the application unable to authenticate against a database that still holds the old password. A managed secret store does not remove that coupling; it just moves where the new value is written first.
 
-**A useful property for GitOps.** Because the Secret appears in no manifest, Argo CD will never track it, and Argo CD only prunes resources carrying its own tracking label. An untracked Secret is therefore not a prune candidate. That is relied on in [Block 05](../blocks/05-gitops.md) and is verified there by criterion 8 rather than assumed.
+**A useful property for GitOps.** Because the Secret appears in no manifest, Argo CD will never track it, and Argo CD only prunes resources carrying its own tracking label. An untracked Secret is therefore not a prune candidate, and the Application also runs with `prune: false`, a second independent protection. See [../architecture.md](../architecture.md#gitops).
 
 ## Consequences
 
@@ -64,7 +64,7 @@ ADR 0007's central principle is upheld: **no secret in Git, in a manifest, in a 
 ### Negative
 
 - **A manual step blocks every rebuild.** [reproduce.md](../operations/reproduce.md) stops at step 9 until an operator creates the Secret. The platform is not reproducible from `terraform apply` plus `kubectl apply` alone, and this is one of the reasons why.
-- **The value exists only in the cluster.** Losing the cluster loses the credential. The database would have to be recreated, and since there is no backup either, this compounds the [Block 06](../blocks/06-data-durability.md) risk: a cluster loss means losing both the data and the credential that opened it.
+- **The value exists only in the cluster.** Losing the cluster loses the credential. The database would have to be recreated, and since there is no backup either, this compounds the data durability risk tracked in [../roadmap.md](../roadmap.md#next-block): a cluster loss means losing both the data and the credential that opened it.
 - **No audit trail.** Nothing records who created or last rotated the value, or when. AWS Secrets Manager would have given that through CloudTrail.
 - **No rotation history.** Secrets Manager keeps previous versions, so a bad rotation can be rolled back. Here, a bad rotation is recovered by rotating again.
 - **A Kubernetes Secret is base64, not encryption.** Anyone with `get secret` in `vote-dev` reads the password in clear text. There is no RBAC restriction limiting that today, and no NetworkPolicy or Pod Security boundary around it either. Secrets Manager would not change the in-cluster exposure, but it would at least mean the cluster was not the only copy.
