@@ -1,49 +1,115 @@
+
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <title>{{option_a}} vs {{option_b}}!</title>
-    <base href="/index.html">
-    <meta name = "viewport" content = "width=device-width, initial-scale = 1.0">
-    <meta name="keywords" content="docker-compose, docker, stack">
-    <meta name="author" content="Tutum dev team">
-    <link rel='stylesheet' href="{{ url_for('static',filename='stylesheets/style.css') }}" />
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
-  </head>
-  <body>
-    <div id="content-container">
-      <div id="content-container-center">
-        <h3>{{option_a}} vs {{option_b}}!</h3>
-        <form id="choice" name='form' method="POST" action="/">
-          <button id="a" type="submit" name="vote" class="a" value="a">{{option_a}}</button>
-          <button id="b" type="submit" name="vote" class="b" value="b">{{option_b}}</button>
-        </form>
-        <div id="tip">
-          (Tip: you can change your vote)
-        </div>
-        <div id="hostname">
-          Processed by container ID {{hostname}}
-        </div>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <meta
+    name="description"
+    content="Is it a cat or a dog? Take a closer look and cast your vote."
+  >
+
+  <title>Cats vs Dogs | WTT CampusOne</title>
+
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='stylesheets/style.css') }}"
+  >
+</head>
+
+<body>
+  <main class="page">
+    <section class="vote-card" aria-labelledby="page-title">
+
+      <div class="eyebrow">
+        <span class="eyebrow-dot" aria-hidden="true"></span>
+        A LITTLE PET MYSTERY
       </div>
-    </div>
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js" type="text/javascript"></script>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/jquery-cookie/1.4.1/jquery.cookie.js"></script>
 
-    {% if vote %}
-    <script>
-      var vote = "{{vote}}";
+      <div class="hero-frame">
+        <img
+          class="hero-image"
+          src="{{ url_for('static', filename='images/catdog.webp') }}"
+          alt="A playful illustration of a cat-faced pet with floppy dog ears"
+          loading="eager"
+          fetchpriority="high"
+        >
+      </div>
 
-      if(vote == "a"){
-        $(".a").prop('disabled', true);
-        $(".a").html('{{option_a}} <i class="fa fa-check-circle"></i>');
-        $(".b").css('opacity','0.5');
-      }
-      if(vote == "b"){
-        $(".b").prop('disabled', true);
-        $(".b").html('{{option_b}} <i class="fa fa-check-circle"></i>');
-        $(".a").css('opacity','0.5');
-      }
-    </script>
-    {% endif %}
-  </body>
+      <header class="intro">
+        <h1 id="page-title">
+          <span class="cats-word">Cats</span>
+          <span class="vs-word">vs</span>
+          <span class="dogs-word">Dogs</span>
+        </h1>
+
+
+        <p class="question">
+          Take a closer look and cast your vote.
+        </p>
+      </header>
+
+      <form
+        id="choice"
+        class="choices"
+        method="post"
+        action="/"
+      >
+        <button
+          id="a"
+          class="choice cats{% if vote == 'a' %} selected{% endif %}"
+          type="submit"
+          name="vote"
+          value="a"
+        >
+          <span class="choice-symbol" aria-hidden="true">🐱</span>
+          <span>CATS</span>
+
+          {% if vote == 'a' %}
+          <span class="choice-check" aria-hidden="true">✓</span>
+          {% endif %}
+        </button>
+
+        <button
+          id="b"
+          class="choice dogs{% if vote == 'b' %} selected{% endif %}"
+          type="submit"
+          name="vote"
+          value="b"
+        >
+          <span class="choice-symbol" aria-hidden="true">🐶</span>
+          <span>DOGS</span>
+
+          {% if vote == 'b' %}
+          <span class="choice-check" aria-hidden="true">✓</span>
+          {% endif %}
+        </button>
+      </form>
+
+      {% if vote %}
+      <div class="after-vote" role="status">
+        <p class="thanks">Your vote is in!</p>
+
+        <a class="results-link" href="/result/">
+          <span aria-hidden="true">▥</span>
+          <span>See results</span>
+          <span aria-hidden="true">→</span>
+        </a>
+      </div>
+      {% endif %}
+
+      <p class="hint">
+        Changed your mind? You can vote again.
+      </p>
+
+      <footer class="footer">
+        WTT CampusOne
+        <span aria-hidden="true">·</span>
+        Built with a little curiosity
+      </footer>
+
+    </section>
+  </main>
+</body>
 </html>

@@ -1,129 +1,396 @@
-@import url(//fonts.googleapis.com/css?family=Open+Sans:400,700,600);
 
-*{
-  box-sizing:border-box;
+:root {
+  color-scheme: light;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  color: #302b29;
+  background: #fff9f1;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
-html,body{
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 280px;
+}
+
+body {
   margin: 0;
-  padding: 0;
-  background-color: #F7F8F9;
-  height: 100vh;
-  font-family: 'Open Sans';
+  min-height: 100svh;
+  background:
+    radial-gradient(
+      ellipse 24rem 20rem at -7% 12%,
+      rgba(236, 158, 83, .24),
+      transparent 75%
+    ),
+    radial-gradient(
+      ellipse 28rem 22rem at 108% 85%,
+      rgba(213, 126, 67, .18),
+      transparent 75%
+    ),
+    radial-gradient(
+      ellipse 16rem 17rem at 88% 8%,
+      rgba(235, 185, 110, .15),
+      transparent 80%
+    ),
+    #fff9f1;
 }
 
-button{
-  border-radius: 0;
-  width: 100%;
-  height: 50%;
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
 }
 
-button[type="submit"] {
-  -webkit-appearance:none; -webkit-border-radius:0;
-}
+/* Main layout */
 
-button i{
-  float: right;
-  padding-right: 30px;
-  margin-top: 3px;
-}
-
-button.a{
-  background-color: #1aaaf8;
-}
-
-button.b{
-  background-color: #00cbca;
-}
-
-#tip{
-  text-align: left;
-  color: #c0c9ce;
-  font-size: 14px;
-}
-
-#hostname{
-  position: absolute;
-  bottom: 100px;
-  right: 0;
-  left: 0;
-  color: #8f9ea8;
-  font-size: 24px;
-}
-
-#content-container{
-  z-index: 2;
+.page {
   position: relative;
-  margin: 0 auto;
-  display: table;
-  padding: 10px;
-  max-width: 940px;
-  height: 100%;
+  isolation: isolate;
+  display: flex;
+  min-height: 100svh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 3vw, 42px) 16px 22px;
 }
-#content-container-center{
-  display: table-cell;
+
+/* Voting card */
+
+.vote-card {
+  width: min(100%, 690px);
+  padding: clamp(17px, 3.5vw, 36px);
+  border: 1px solid #f2e6d9;
+  border-radius: 30px;
+  background: rgba(255, 255, 255, .85);
+  box-shadow: 0 22px 70px rgba(110, 67, 35, .09);
   text-align: center;
 }
 
-#content-container-center h3{
-  color: #254356;
+/* Small heading */
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 16px;
+  color: #967354;
+  font-size: .71rem;
+  letter-spacing: .16em;
+  font-weight: 750;
 }
 
-#choice{
-  transition: all 300ms linear;
-  line-height: 1.3em;
-  display: inline;
-  vertical-align: middle;
-  font-size: 3em;
-}
-#choice a{
-  text-decoration:none;
-}
-#choice a:hover, #choice a:focus{
-  outline:0;
-  text-decoration:underline;
+.eyebrow-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e89048;
 }
 
-#choice button{
+/* Hero illustration */
+
+.hero-frame {
+  overflow: hidden;
+  border-radius: 21px;
+  background: #ebd4ba;
+  box-shadow: 0 8px 22px rgba(113, 80, 51, .10);
+}
+
+.hero-image {
   display: block;
-  height: 80px;
-  width: 330px;
-  border: none;
-  color: white;
-  text-transform: uppercase;
-  font-size:18px;
-  font-weight: 700;
-  margin-top: 10px;
-  margin-bottom: 10px;
-  text-align: left;
-  padding-left: 50px;
+  width: 100%;
+  height: auto;
+  max-height: 390px;
+  object-fit: contain;
 }
 
-#choice button.a:hover{
-  background-color: #1488c6;
+/* Main title and description */
+
+.intro {
+  padding: 17px 0 16px;
 }
 
-#choice button.b:hover{
-  background-color: #00a2a1;
+h1 {
+  margin: 0 0 6px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2rem, 5.3vw, 3.2rem);
+  font-weight: 750;
+  line-height: 1.16;
+  letter-spacing: -.035em;
 }
 
-#choice button.a:focus{
-  background-color: #1488c6;
+.cats-word {
+  color: #4a77bd;
 }
 
-#choice button.b:focus{
-  background-color: #00a2a1;
+.vs-word {
+  color: #765347;
 }
 
-#background-stats{
-  z-index:1;
-  height:100%;
-  width:100%;
-  position:absolute;
+.dogs-word {
+  color: #276960;
 }
-#background-stats div{
-  transition: width 400ms ease-in-out;
-  display:inline-block;
-  margin-bottom:-4px;
-  width:50%;
-  height:100%;
+
+.tagline,
+.question {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.tagline {
+  font-size: clamp(.9rem, 2.1vw, 1rem);
+  font-weight: 650;
+}
+
+.question {
+  color: #877f79;
+  font-size: .91rem;
+}
+
+/* Voting buttons */
+
+.choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.choice {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  min-width: 0;
+  min-height: 68px;
+  padding: 15px 24px;
+  border: 2px solid transparent;
+  border-radius: 16px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: .07em;
+  transition:
+    transform .15s ease,
+    box-shadow .15s ease,
+    background-color .15s ease;
+}
+
+.choice:hover {
+  transform: translateY(-2px);
+}
+
+.choice:active {
+  transform: translateY(0);
+}
+
+.choice:focus-visible,
+.results-link:focus-visible {
+  outline: 3px solid #cc762b;
+  outline-offset: 4px;
+}
+
+.choice-symbol {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+/* Cat button */
+
+.choice.cats {
+  background: #e3ecfe;
+  color: #2f5eaa;
+  border-color: #cddcf5;
+}
+
+.choice.cats.selected {
+  background: #5f90e7;
+  color: #fff;
+  border-color: #4277d6;
+  box-shadow: 0 6px 18px rgba(95, 144, 231, .27);
+}
+
+/* Dog button */
+
+.choice.dogs {
+  background: #dbefea;
+  color: #22665f;
+  border-color: #bee3d9;
+}
+
+.choice.dogs.selected {
+  background: #328e81;
+  color: #fff;
+  border-color: #26796e;
+  box-shadow: 0 6px 18px rgba(50, 142, 129, .24);
+}
+
+/* Selected vote indicator */
+
+.choice-check {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .94);
+  color: #4176c7;
+  font-size: .9rem;
+}
+
+.dogs .choice-check {
+  color: #247d71;
+}
+
+/* Results link appears after voting */
+
+.after-vote {
+  margin-top: 18px;
+}
+
+.thanks {
+  margin: 0 0 10px;
+  color: #5f625b;
+  font-size: .88rem;
+}
+
+.results-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: min(100%, 320px);
+  min-height: 54px;
+  padding: 12px 18px;
+  border-radius: 16px;
+  background: #dc7730;
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(220, 119, 48, .19);
+  font-weight: 750;
+  text-decoration: none;
+  transition:
+    background-color .15s ease,
+    transform .15s ease;
+}
+
+.results-link:hover {
+  background: #b95f20;
+  transform: translateY(-1px);
+}
+
+/* Helper text and footer */
+
+.hint {
+  margin: 16px 0 0;
+  color: #918982;
+  font-size: .83rem;
+}
+
+.footer {
+  padding-top: 18px;
+  text-align: center;
+  font-size: .75rem;
+  color: #987f69;
+  line-height: 1.5;
+}
+
+.footer span {
+  padding: 0 7px;
+}
+
+/* Mobile layout */
+
+@media (max-width: 560px) {
+  .page {
+    justify-content: flex-start;
+    padding: 12px 12px 18px;
+  }
+
+  .vote-card {
+    border-radius: 21px;
+    padding: 14px;
+  }
+
+  .eyebrow {
+    margin-bottom: 12px;
+    font-size: .65rem;
+    letter-spacing: .11em;
+  }
+
+  .hero-frame {
+    border-radius: 14px;
+  }
+
+  .hero-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 45svh;
+    object-fit: contain;
+  }
+
+  .intro {
+    padding: 15px 0 14px;
+  }
+
+  h1 {
+    font-size: clamp(1.8rem, 8vw, 2.35rem);
+  }
+
+  .tagline {
+    font-size: .95rem;
+  }
+
+  .question {
+    font-size: .86rem;
+  }
+
+  .choices {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .choice {
+    width: 100%;
+    min-height: 58px;
+    border-radius: 13px;
+  }
+
+  .after-vote {
+    margin-top: 14px;
+  }
+
+  .results-link {
+    width: 100%;
+  }
+
+  .hint {
+    margin-top: 14px;
+  }
+
+  .footer {
+    padding-top: 14px;
+  }
+}
+
+/* Accessibility: reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  .choice,
+  .results-link {
+    transition: none;
+  }
+
+  .choice:hover,
+  .results-link:hover {
+    transform: none;
+  }
 }
