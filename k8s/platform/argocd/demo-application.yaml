@@ -17,6 +17,10 @@ spec:
   namespaceResourceWhitelist:
     - group: ""
       kind: ConfigMap
+    - group: ""
+      kind: Service
+    - group: apps
+      kind: Deployment
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
