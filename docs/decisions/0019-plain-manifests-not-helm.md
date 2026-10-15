@@ -54,7 +54,7 @@ Applied with `kubectl apply -f`. Traefik and cert-manager remain Helm releases i
 
 **Readability matters more than reuse at this size.** Sixteen objects. `k8s/base/postgres/statefulset.yaml` can be read and understood without rendering it first. For a project whose purpose is to demonstrate understanding to a reviewer, a file that says what it does beats a template that must be executed to be read.
 
-**`kubectl diff -f` works directly.** Comparing a file against the cluster needs no `helm template` step, which matters for the Argo CD adoption in [Block 05](../blocks/05-gitops.md), where the whole method is to prove an empty diff before syncing.
+**`kubectl diff -f` works directly.** Comparing a file against the cluster needs no `helm template` step, which mattered for adopting the running application into Argo CD — see [../roadmap.md](../roadmap.md), Block 05 — where the method was to prove an empty diff before syncing.
 
 **Argo CD treats a directory as a first-class source.** Choosing plain YAML costs nothing in the GitOps plan.
 
