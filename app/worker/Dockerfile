@@ -12,7 +12,10 @@ RUN dotnet publish -c Release -o /app/publish
 
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/runtime:8.0 AS runtime
-WORKDIR /app
+
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy the published output from the build stage
 COPY --from=build /app/publish ./
