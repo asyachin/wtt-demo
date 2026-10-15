@@ -2,8 +2,6 @@ name: CI - Application Images
 
 on:
   push:
-    branches:
-      - block/07-github-actions
   workflow_dispatch:
 
 permissions:
@@ -47,8 +45,24 @@ jobs:
       - name: Build Worker
         run: dotnet build app/worker/Worker.csproj -c Release
 
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      image_tag: ${{ steps.generate.outputs.image_tag }}
+    steps:
+      - name: Generate image version
+        id: generate
+        shell: bash
+        run: |
+          timestamp="$(date -u +'%Y.%m.%d-%H%M')"
+          short_sha="${GITHUB_SHA:0:7}"
+          image_tag="${timestamp}-build.${GITHUB_RUN_NUMBER}-a${GITHUB_RUN_ATTEMPT}-${short_sha}"
+
+          echo "image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
+          echo "Image version: ${image_tag}"
+
   images:
-    needs: [python-tests, node-check, dotnet-check]
+    needs: [version, python-tests, node-check, dotnet-check]
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -66,10 +80,36 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and publish
+
+      - name: Build image locally
         uses: docker/build-push-action@v7
         with:
           context: ./app/${{ matrix.service }}
           platforms: linux/amd64
-          push: true
-          tags: ghcr.io/asyachin/wtt-demo/${{ matrix.service }}:${{ github.sha }}
+          push: false
+          load: true
+          tags: |
+            ghcr.io/asyachin/wtt-demo/${{ matrix.service }}:${{ needs.version.outputs.image_tag }}
+            ghcr.io/asyachin/wtt-demo/${{ matrix.service }}:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.version.outputs.image_tag }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/asyachin/wtt-demo
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: ghcr.io/asyachin/wtt-demo/${{ matrix.service }}:${{ needs.version.outputs.image_tag }}
+          scan-type: image
+          scanners: vuln
+          vuln-type: os,library
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
+
+      - name: Publish verified image
+        shell: bash
+        run: |
+          docker push "ghcr.io/asyachin/wtt-demo/${{ matrix.service }}:${{ needs.version.outputs.image_tag }}"
+          docker push "ghcr.io/asyachin/wtt-demo/${{ matrix.service }}:${{ github.sha }}"
