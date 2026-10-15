@@ -18,7 +18,9 @@ What follows for acceptance criteria:
 - A document-level check must be accompanied by an asset-level check, and by a browser observation with the console open.
 - Mixed content can be caught mechanically without a browser by extracting every `src` and `href` from the served HTML and asserting none begins with `http://`.
 
-Note the distinction: `http://host/path` on an HTTPS page is blocked. A **protocol-relative** `//host/path` is not — it resolves to HTTPS. The project still has one protocol-relative reference, which is a legacy pattern rather than a defect.
+Note the distinction: `http://host/path` on an HTTPS page is blocked. A **protocol-relative** `//host/path` is not — it resolves to HTTPS. The project no longer has either kind: the v0.8.0 interface redesign removed every third-party asset reference and the page now serves nothing but its own origin.
+
+The more durable fix, applied in that redesign, was not correcting a URL but **removing the client-side code entirely**. The voted-state highlight used to be set by jQuery after the page loaded; it is now rendered server-side with Jinja, `{% if vote == 'a' %}selected{% endif %}`. A page with no JavaScript cannot have its JavaScript blocked, and no CDN outage can affect it. When a defect is caused by a dependency, removing the dependency is worth considering before patching the reference to it.
 
 ## Writing an acceptance criterion the application cannot satisfy
 
@@ -158,7 +160,7 @@ Two properties of EBS shape the design:
 - **A volume exists in one availability zone.** The pod can therefore only ever be scheduled in that zone. If the zone is short of capacity, the pod does not start elsewhere — it stays `Pending`.
 - **`volumeBindingMode: WaitForFirstConsumer` is not optional.** With immediate binding, the volume is created before the scheduler has picked a node, so it can land in a zone where the pod cannot be placed, producing a permanently `Pending` pod with a perfectly healthy volume.
 
-The dangerous part is the reclaim policy. The `gp3` StorageClass uses `reclaimPolicy: Delete`, so deleting the PVC destroys the volume and all voting data. A `Retain` policy protects against accidental deletion — but **`Retain` is not a backup.** It does nothing about corruption, a bad migration, or deletion of the volume itself. Both protections are needed and neither exists yet; see [blocks/06-data-durability.md](blocks/06-data-durability.md).
+The dangerous part is the reclaim policy. The `gp3` StorageClass uses `reclaimPolicy: Delete`, so deleting the PVC destroys the volume and all voting data. A `Retain` policy protects against accidental deletion — but **`Retain` is not a backup.** It does nothing about corruption, a bad migration, or deletion of the volume itself. Both protections are needed and neither exists yet; see [roadmap.md](roadmap.md#next-block).
 
 ## VPC CNI pod density, not CPU, sizes the nodes
 
@@ -173,6 +175,33 @@ kubectl get node -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.al
 ```
 
 Prefix delegation on the CNI raises the limit substantially and is the usual answer when this becomes a cost problem. It is not configured here.
+
+## A security gate only proves itself by rejecting something
+
+A Trivy scan was added to CI with `exit-code: 1` on `CRITICAL` severity. The temptation with any new gate is to assume it works because the pipeline is green. It does not prove anything until it has actually stopped a bad build.
+
+That happened in this project: the scan failed on the `result` and `worker` images, naming vulnerable versions of `express` and `StackExchange.Redis`, plus unpatched operating system packages in both base images. The fix was a dependency bump in each `package.json` and `.csproj`, and an `apt-get upgrade` added to both Dockerfiles so the layer itself is patched, not only the application dependency. Recorded as version 0.7.1.
+
+The ordering matters as much as the gate itself: the workflow builds the image, scans it, and **only then** pushes it to the registry. A vulnerable image is therefore never published, rather than published and flagged after the fact. A scan that runs after publication is a report; a scan that runs before publication is a gate.
+
+## Adopting a live system into GitOps, without breaking it
+
+Argo CD was not pointed at the running application on day one. The live demonstration already existed and had to keep working throughout.
+
+The sequence used: an isolated, disposable workload (`gitops-demo`, a single nginx Deployment) proved the installation and the sync mechanism first, with no risk to anything real. Only once that worked was the real `vote-dev-apps` Application created, pointed at the manifests that were already running in the cluster, so Argo CD's first sync **adopted** existing objects rather than creating new ones. Automatic sync and self-healing were enabled only after that adoption was confirmed not to have replaced anything.
+
+Two settings did more safety work than any amount of care would have:
+
+- **`prune: false`.** Argo CD will never delete a resource it does not recognise as declared in Git. The `postgres-credentials` Secret, created by hand and present in no manifest, is therefore never a deletion candidate — not because anyone remembered to exclude it, but because it was never tracked in the first place.
+- **The `AppProject` resource whitelist.** Limiting the project to `Service` and `apps/Deployment` means a manifest for anything else — a Secret, a StatefulSet, a Namespace — cannot be synced even by mistake. The boundary is enforced by the API server, not by a reviewer's attention.
+
+The resulting scope is deliberately narrow: Argo CD manages three Deployments and three Services. Routing, data services, cert-manager and Traefik are still applied by hand. Widening that scope is real future work, and the narrow boundary is itself the safety mechanism, not a shortcut that happened to work this time.
+
+## Separating a code change from its deployment
+
+A feature branch and a release branch are not the same pull request. `feature/vote-landing-page` changed the template and stylesheet; `release/vote-landing-page` changed one line in a Kubernetes manifest to point at the image that feature built. Both merged to `dev`, as two separate, independently revertible commits.
+
+The payoff showed up directly: when a release needed to be rolled back, `git revert` on the release commit alone restored the previous image with no change to the application source, and the revert was itself reverted once the real fix landed. Mixing the two into one commit would have made a rollback an editing exercise instead of a single command.
 
 ## What must never be committed
 

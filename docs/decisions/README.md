@@ -5,7 +5,7 @@ Two sets of records, kept deliberately apart.
 | Set | What it is | Location |
 |---|---|---|
 | **0001–0016** | The original pre-implementation design record. Written on 14 October 2026, in a single commit, **before any infrastructure existed**. Preserved byte-for-byte. | [initial/](initial/) |
-| **0017–0020** | Decisions actually made during implementation, written down afterwards. Each is explicitly labelled retrospective and names the commits it was reconstructed from. | this directory |
+| **0017–0021** | Decisions actually made during implementation, written down afterwards. Each is explicitly labelled retrospective and names the commits it was reconstructed from. | this directory |
 
 This index is a living document, not a record. It states which original decisions still apply. It does not modify any record, including status fields.
 
@@ -13,7 +13,7 @@ This index is a living document, not a record. It states which original decision
 
 [ADR 0001](initial/0001-record-architecture-decisions.md) established that a record is never edited once accepted, only superseded. That rule is honoured literally here, including where implementation went on to contradict a record.
 
-The consequence is that reading `initial/` alone will mislead you about the current system. That is the intended trade: the records show what was believed on 14 October, and this index plus [../reconciliation.md](../reconciliation.md) show what is true now. An edited record would have destroyed the only evidence of what was believed and when.
+The consequence is that reading `initial/` alone will mislead you about the current system. That is the intended trade: the records show what was believed on 14 October, and this index plus [../architecture.md](../architecture.md) show what is true now. An edited record would have destroyed the only evidence of what was believed and when.
 
 **Honest provenance.** All sixteen were authored in one sitting during the design phase, in commit `5898c60`. They are an up-front design record, not an organic decision log accumulated over months. Presenting them as the latter would be a false claim.
 
@@ -25,20 +25,20 @@ The consequence is that reading `initial/` alone will mislead you about the curr
 | [0002](initial/0002-keep-polyglot-application.md) | Keep the application in three languages | **Yes.** No service was rewritten. |
 | [0003](initial/0003-single-cluster-two-namespaces.md) | One cluster, two namespaces | **Partly.** One cluster, as decided. Only `vote-dev` is deployed; `vote-prod` is empty and is not a production environment. The private-nodes and single-NAT reasoning holds in full. |
 | [0004](initial/0004-data-services-in-cluster.md) | PostgreSQL and Redis in the cluster | **Partly.** The decision holds. Three details differ: the volume is 5 GiB not 10, its reclaim policy is `Delete` not `Retain`, and Redis has no volume at all. The backup the record promised does not exist. |
-| [0005](initial/0005-gitops-with-argocd.md) | Deliver with Argo CD | **Deferred.** Not installed. Intent unchanged; see [../blocks/05-gitops.md](../blocks/05-gitops.md). |
-| [0006](initial/0006-registry-and-image-tags.md) | GHCR, and a dual-image tag scheme | **Partly.** GHCR, as decided. The tag scheme, the paired dev and prod images, signing and SBOM were all dropped in favour of one image per service tagged with the source commit. |
+| [0005](initial/0005-gitops-with-argocd.md) | Deliver with Argo CD | **Mostly yes.** Installed and running, `selfHeal: true`. Scope is narrower than the record intended: Argo CD manages the application Deployments and Services only, not routing, data services, cert-manager or Traefik. |
+| [0006](initial/0006-registry-and-image-tags.md) | GHCR, and a dual-image tag scheme | **Partly.** GHCR, as decided. The dual dev/prod image pair, signing and SBOM were dropped. A different tag scheme was implemented instead; see [0021](0021-ci-image-versioning.md). |
 | [0007](initial/0007-secrets-management.md) | AWS Secrets Manager plus External Secrets Operator | **No.** Superseded by [0020](0020-manual-postgres-secret.md). The record's central principle — no secret in Git — is upheld by different means. |
 | [0008](initial/0008-ingress-and-dns.md) | One ALB with ACM | **No.** Superseded during design, before implementation, by 0015 and 0016. The record says so itself. |
 | [0009](initial/0009-observability.md) | Prometheus and Grafana with a read-only API | **Deferred.** Nothing installed. `grafana.wtt-demo.syachin.de` does not resolve. Block 08, optional. |
 | [0010](initial/0010-no-ansible.md) | Do not use Ansible | **Yes.** No Ansible in the repository. |
-| [0011](initial/0011-container-build-standards.md) | Multi-stage, non-root, pinned, labelled images | **Deferred.** `vote` and `worker` are multi-stage; `result` is single-stage and ships `nodemon`. All three run as root. Python dependencies are unpinned. No OCI labels. Block 09. |
-| [0012](initial/0012-testing-strategy.md) | One Python test harness, four layers, Trivy non-blocking | **Partly.** The pytest harness and the markers exist. 12 unit tests exist against a planned 186. No integration, platform or end-to-end tests. No CI, so the Trivy reasoning is untested. |
-| [0013](initial/0013-branching-and-promotion.md) | Two branches, auto-merge into dev, manual promotion | **Partly.** Block branches and `dev` as the integration branch, as decided. `main` lags at `5898c60`. No CI, so no auto-merge and no promotion. |
+| [0011](initial/0011-container-build-standards.md) | Multi-stage, non-root, pinned, labelled images | **Partly.** `vote` and `worker` are multi-stage; `result` is single-stage and ships `nodemon`. All three run as root. Python dependencies are unpinned. OCI version and revision labels are now applied by CI; a title and licence label are not. Block 09. |
+| [0012](initial/0012-testing-strategy.md) | One Python test harness, four layers, Trivy non-blocking | **Partly.** The pytest harness and the markers exist. 12 unit tests exist against a planned 186, and CI now runs them plus a Node.js and a .NET build check on every push. Trivy exists, but blocks on `CRITICAL` rather than reporting without blocking, the opposite of what the record proposed; see [0021](0021-ci-image-versioning.md). No integration, platform or end-to-end tests. |
+| [0013](initial/0013-branching-and-promotion.md) | Two branches, auto-merge into dev, manual promotion | **Partly.** `dev` is the integration branch, as decided, and `main` now tracks it exactly. The branch model is richer than planned: `feature/*`, `fix/*` and `release/*` are distinct, each as its own pull request. There is no auto-merge; every pull request is reviewed. |
 | [0014](initial/0014-domain-and-dns-zone.md) | Use `wtt-demo.syachin.de` | **Yes.** One detail differs: the certificate covers a single name, not the wildcard the record describes. |
-| [0015](initial/0015-traefik-gateway-api.md) | Traefik with the Gateway API | **Yes**, and it is the most accurate of the sixteen. Two items within it are not done: the HTTP-to-HTTPS redirect and the response security headers, both Block 04. Proxy Protocol v2 is deferred. |
+| [0015](initial/0015-traefik-gateway-api.md) | Traefik with the Gateway API | **Yes.** The HTTP-to-HTTPS redirect is now implemented. Response security headers remain outstanding, Block 04. Proxy Protocol v2 is deferred. |
 | [0016](initial/0016-tls-with-cert-manager.md) | cert-manager with Let's Encrypt and DNS-01 | **Yes.** Implemented as described, including the staging-first sequence. The least-privilege scoping went further than the record proposed. The wildcard did not happen. |
 
-Summary: 5 apply in full, 6 apply in part, 3 are deferred, 2 are superseded.
+Summary: 6 apply in full, 7 apply in part, 1 is deferred, 2 are superseded.
 
 ## Retrospective records
 
@@ -50,6 +50,7 @@ Each carries a `Recorded` field naming the commits it was reconstructed from. No
 | [0018](0018-eks-pod-identity.md) | EKS Pod Identity instead of IRSA | `0967c66`, `71f0e0a` |
 | [0019](0019-plain-manifests-not-helm.md) | Plain Kubernetes manifests instead of a Helm chart | `fa8f5e7`, `b940f96`, `50ef706` |
 | [0020](0020-manual-postgres-secret.md) | A manually created Secret instead of External Secrets | `b940f96`, `2d1049f` |
+| [0021](0021-ci-image-versioning.md) | A dated version scheme with a blocking Trivy gate, instead of dual images with cosign and SBOM | `6a05570`, `5e7d360`, `11b36e6`, `8625709` |
 
 ## Known limitation of this archive
 
@@ -73,9 +74,20 @@ To read the originals alongside the documents they reference, use the commit whe
 - [`docs/dev/deployment-plan.md` at 5898c60](https://github.com/asyachin/wtt-demo/blob/5898c60/docs/dev/deployment-plan.md)
 - [`docs/arch/overview.md` at 5898c60](https://github.com/asyachin/wtt-demo/blob/5898c60/docs/arch/overview.md)
 
+## Deviations not covered by a decision record
+
+Smaller implementation facts, not significant enough for their own record, are tracked where they are most useful rather than duplicated here:
+
+| Deviation | Where it is documented |
+|---|---|
+| Image versions, node sizing, Kubernetes and VPC details differing from the original plan | [../architecture.md](../architecture.md) |
+| Application defects found and fixed during implementation | [../application.md](../application.md#defect-register) |
+| Block ordering differing from the plan, and unplanned work | [../roadmap.md](../roadmap.md) |
+| Operational lessons — ownership boundaries, routing filter semantics, the CI security gate | [../lessons.md](../lessons.md) |
+
 ## Adding a record
 
-Use [initial/template.md](initial/template.md). Next number is 0021.
+Use [initial/template.md](initial/template.md). Next number is 0022.
 
 Write a record when a choice is hard to reverse, costs money, affects security, will surprise a reader, or was contested. Do not write one for something a linter or a test already enforces.
 

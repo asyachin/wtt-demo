@@ -1,149 +1,131 @@
 # Delivery process
 
-The process is deliberately small. Its purpose is that any claim in this repository can be traced to a commit and a verification, and that a deviation from plan is recorded rather than absorbed.
+Small by design. Its purpose is that any claim in this repository can be traced to a commit, and that a deviation from plan is recorded rather than absorbed.
 
-## Status vocabulary
+## Branches
+
+| Branch | Purpose | Merged by |
+|---|---|---|
+| `main` | Released state | Pull request from `dev` |
+| `dev` | Integration branch. Argo CD syncs the application from it. | Pull request |
+| `feature/*` | New behaviour | Pull request into `dev` |
+| `fix/*` | A correction | Pull request into `dev` |
+| `release/*` | Promotes a built image: one line in `k8s/apps/dev/applications.yaml` | Pull request into `dev` |
+| `block/*` | A roadmap block | Pull request into `dev` |
+| `docs/*` | Documentation only | Pull request into `dev` |
+
+### Why `feature/*` and `release/*` are separate
+
+A code change and the deployment of the image built from it are different events with different risks, so they are different pull requests.
+
+```
+feature/vote-landing-page   →  PR #6  →  dev  →  CI builds vote:…-build.21
+release/vote-landing-page   →  PR #7  →  dev  →  Argo CD deploys build.21
+```
+
+The benefit is that reverting a release returns the cluster to the previous image without reverting the source change, and reverting a source change does not implicitly roll the cluster back. Each is a one-line revert of an independent commit. This was exercised in `3f9d2a6` and `eac7c13`.
+
+## Status values
 
 | Status | Meaning |
 |---|---|
 | `PLANNED` | Acceptance criteria written and agreed. No work started. |
-| `IN PROGRESS` | Branch exists, work underway. Some criteria may already be met. |
-| `BLOCKED` | Cannot proceed. The blocker is named in the block report. |
-| `VERIFIED` | Every acceptance criterion met and evidence recorded. Not yet merged. |
-| `CLOSED` | Merged into `dev`, report complete, roadmap updated. |
-| `OPTIONAL` | Valuable but not required for the current objective. No criteria agreed yet. |
+| `IN PROGRESS` | Work underway. Some criteria may already be met. |
+| `BLOCKED` | Cannot proceed. The blocker is named. |
+| `CLOSED` | Criteria met, evidence recorded, merged into `dev`. |
+| `OPTIONAL` | Valuable, not required for the current objective. No criteria agreed. |
 
-A block moves to `CLOSED` only when its Definition of Done is fully satisfied. Partial completion stays `IN PROGRESS` with the outstanding items listed, which is why Block 04 is `IN PROGRESS` despite part of its scope being deployed.
+A block moves to `CLOSED` only when every criterion is met. Partial completion stays `IN PROGRESS` with the outstanding items listed, which is why Block 04 is open with four of five scope items delivered.
 
 ## Block lifecycle
 
 ```
-1. Write the block report from docs/blocks/template.md.
-   Goal, scope, exclusions, prerequisites, planned work, acceptance criteria.
-   Acceptance criteria are agreed BEFORE implementation starts.
-
-2. Create branch block/NN-slug from dev.
-
-3. Implement. Where a test-first cycle applies, push the failing state first,
-   so that the test is shown to be capable of failing.
-
-4. Verify each acceptance criterion. Record the command and its real output
-   in the report's Evidence section. Nothing is pre-filled.
-
-5. Record deviations. Empty is a valid and good answer.
-
-6. Update documentation per the procedure below, in the same branch.
-
-7. Confirm the Definition of Done, merge into dev, set status CLOSED.
+1. Write the acceptance criteria in docs/roadmap.md, before implementation.
+2. Branch from dev.
+3. Implement. Where a test-first cycle applies, push the failing state first
+   so the test is shown to be capable of failing.
+4. Verify each criterion. Record the command and its real output.
+5. Open a pull request. CI must pass.
+6. Merge to dev, update the roadmap and the changelog, tag if it is a release.
 ```
 
-Branches are kept after merge as implementation evidence. `dev` is the integration branch. `main` currently lags and is updated by a reviewed merge, not automatically.
+Branches are kept after merge as implementation evidence.
 
 ## Definition of Done
 
-Every block carries this checklist. A block that cannot tick every box is not done.
-
 - [ ] Every acceptance criterion verified, with the command and its output recorded
-- [ ] Public demonstration still correct: [operations/verify.md](operations/verify.md) section 1 passes
+- [ ] CI green: lint, tests, build, Trivy scan
+- [ ] Public demonstration still correct — [operations/operate.md](operations/operate.md) section 1 passes
 - [ ] No secret, key or token added to the repository
-- [ ] Documentation updated per the procedure below
-- [ ] Deviations recorded in the block report, and in [reconciliation.md](reconciliation.md) if architectural
-- [ ] Branch merged into `dev`
-- [ ] Status set to `CLOSED` in both the block report and [roadmap.md](roadmap.md)
+- [ ] `docs/roadmap.md` status and evidence updated
+- [ ] `CHANGELOG.md` entry added under the right version
+- [ ] Any architectural deviation recorded in `docs/decisions/README.md`, and a new decision record written if an accepted decision is superseded
+- [ ] Merged into `dev` by pull request
 
-Two rules make the checklist meaningful rather than decorative:
+Two rules keep the checklist meaningful:
 
 - **No criterion may be satisfied by inspection alone.** Each needs a command, an observed output, or a named human observation with a date.
-- **Where only a human can verify something** — browser behaviour, a visual check — the report names the observer, the date, the browser and version. It is not written as though a script proved it.
+- **Where only a human can verify something** — browser behaviour, a visual check — the record names the observer, the date and the browser. It is not written as though a script proved it. Where a detail such as a browser version was not captured, the record says so rather than inventing one.
 
-## Documentation update at block closure
+## Releases and versioning
 
-Executed in the block's own branch, so documentation and implementation merge together.
+`CHANGELOG.md` follows Keep a Changelog; versions follow Semantic Versioning, adapted for a demonstration platform:
 
-```
-1. Fill Evidence in docs/blocks/NN-*.md: commit hashes, command output,
-   operator observations, each dated.
+| Bump | When |
+|---|---|
+| Minor, `0.x.0` | A delivery block closes, or a user-visible change ships |
+| Patch, `0.x.y` | A fix or a security update |
 
-2. Fill Deviations from plan. If a deviation changes architecture or an
-   earlier decision, add a row to docs/reconciliation.md. If it supersedes
-   an accepted decision record, write a new ADR; never edit the old one,
-   not even its status field.
+At each release:
 
-3. Update docs/roadmap.md: status, acceptance evidence, next block.
-
-4. Update only the active documents the block actually changed:
-      architecture.md    components, routing, identity, storage, cost
-      application.md     a defect fixed or discovered
-      operations/*.md    a procedure, command or verification changed
-      lessons.md         reusable operational knowledge produced
-   Touch nothing else. A block that edits every document has unclear scope.
-
-5. Run the consistency checks below.
-
-6. Confirm the Definition of Done, then merge.
-```
-
-### Consistency checks
-
-No Markdown linting tooling is installed in this environment, so these are run as shell checks and reported with their output:
+1. Move the relevant `[Unreleased]` entries under a new version heading with its date.
+2. Link the version to its merge commit or pull request.
+3. Add the comparison link at the foot of the file.
+4. Tag the merge commit:
 
 ```bash
-# Internal links resolve
-python3 - <<'PY'
-import os, re
-bad = []
-for dp, _, fn in os.walk('.'):
-    if '.git' in dp.split(os.sep):
-        continue
-    for f in (x for x in fn if x.endswith('.md')):
-        p = os.path.join(dp, f)
-        for m in re.finditer(r'\[[^\]]*\]\(([^)]+)\)', open(p, encoding='utf-8').read()):
-            t = m.group(1)
-            if t.startswith(('http://', 'https://', '#', 'mailto:')):
-                continue
-            t = t.split('#')[0]
-            if t and not os.path.exists(os.path.normpath(os.path.join(dp, t))):
-                bad.append(f'{p} -> {m.group(1)}')
-print('broken links:', len(bad))
-[print(' ', b) for b in bad]
-PY
-
-# Referenced repository paths exist
-# Block statuses agree between each report and roadmap.md
-# Original decision records unchanged
-sha256sum docs/decisions/initial/*.md
-
-# No secret introduced
-git diff --cached | grep -nEi 'aws_secret_access_key|BEGIN [A-Z ]*PRIVATE KEY|password\s*[:=]\s*\S'
-git diff --check
+git tag -a v0.9.0 <merge-commit> -m "Block NN: short description"
+git push origin v0.9.0
 ```
+
+The tags `v0.1.0` through `v0.8.0` were created on 2026-10-15 and applied to commits that already existed. The changelog states this, so no release date is implied to be the date its tag was created.
+
+## Image versions
+
+Computed by CI, never by hand:
+
+```
+YYYY.MM.DD-HHMM-build.<run number>-a<attempt>-<short sha>
+2026.10.15-1626-build.27-a1-8968dc4
+```
+
+Each service also receives a second tag carrying the full commit SHA, so an image can be found by commit without knowing its build number. Nothing is ever tagged `latest`. Rationale: [decisions/0021-ci-image-versioning.md](decisions/0021-ci-image-versioning.md).
 
 ## Change control
 
 For a deviation discovered mid-block, before implementing it:
 
 ```
-1. Describe the proposed deviation in the block report, under Deviations.
-2. State the technical reason and the impact on the live demonstration.
-3. If an accepted decision is affected, draft the superseding ADR first.
-4. Implement on the block branch.
-5. Verify, and record the evidence.
-6. Commit, merge into dev, update status.
+1. State the technical reason and the impact on the live demonstration.
+2. If an accepted decision is affected, write the superseding record first.
+3. Implement on the branch.
+4. Verify, and record the evidence.
+5. Merge, and update the roadmap, the changelog and the decision index.
 ```
 
-The step that is easy to skip is the third. A decision record that is edited after the fact destroys the only evidence of what was believed and when.
+The step most often skipped is the second. A decision record edited after the fact destroys the only evidence of what was believed and when.
 
 ## Decision records
 
-[ADR 0001](decisions/initial/0001-record-architecture-decisions.md) established that a record is never edited once accepted, only superseded. That rule is honoured literally, including for status fields.
+[ADR 0001](decisions/initial/0001-record-architecture-decisions.md) established that a record is never edited once accepted, only superseded. That is honoured literally, including status fields.
 
-As a consequence, the original records in [decisions/initial/](decisions/initial/) are preserved byte-for-byte even where implementation contradicted them. Current applicability is tracked separately in [decisions/README.md](decisions/README.md), which is a living index rather than a record.
+The original sixteen records are therefore preserved byte-for-byte in [decisions/initial/](decisions/initial/) even where implementation contradicted them. Current applicability is tracked separately in [decisions/README.md](decisions/README.md), which is a living index rather than a record.
 
-Records written after the fact carry an explicit `Recorded` field stating that they are retrospective and naming the commits they were reconstructed from. No record is given a date earlier than the day it was written.
+Records written after the fact carry an explicit `Recorded` field stating they are retrospective and naming the commits they were reconstructed from. No record is given a date earlier than the day it was written.
 
-## What this process does not do
+## What this process does not have
 
-It has no approval gates, no sign-off matrix and no templates beyond the single block report. For a single-engineer project those would be ceremony. The three things it does enforce are:
+No approval gates, no sign-off matrix, no templates beyond the roadmap entry. For a single-engineer project those would be ceremony. The three things it does enforce:
 
 - acceptance criteria written before implementation,
 - evidence recorded at the time of verification,

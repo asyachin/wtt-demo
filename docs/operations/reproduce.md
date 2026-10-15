@@ -1,89 +1,90 @@
 # Rebuild from a clean environment
 
-How to build this platform in a fresh AWS account. Every command matches the repository at `a4d979f`.
+How to build this platform in a fresh AWS account. Commands match the repository at `390a119`.
 
-> **This is a documented procedure, not a verified one.** It was written by reading the Terraform roots, the manifests and the Git history. **A clean-environment reproduction has never been performed.** Block 10 exists to run it and correct whatever is wrong. Expect to find gaps, particularly in the steps marked **MANUAL**.
+> **A documented procedure, not a verified one.** It was written by reading the Terraform roots, the manifests and the Git history. **A clean-environment rebuild has never been performed.** Block 10 exists to run it and correct whatever is wrong. Expect gaps, particularly in the steps marked MANUAL.
 
 ## Steps that are not automated
 
-Read this before starting. The platform is not reproducible from `terraform apply` alone.
-
 | Step | Why it is manual |
 |---|---|
-| Gateway API CRD installation | Applied with `kubectl`. Version recorded below. |
-| Traefik installation | Helm release. Chart and values recorded below; the original install command was not captured and is reconstructed. |
-| cert-manager installation | Helm release from an OCI registry. Chart and source recorded below. |
+| Gateway API CRDs | `kubectl apply` of a release manifest |
+| Traefik | Helm release. The original install command was not captured; the one below is reconstructed from the committed values files. |
+| cert-manager | Helm release from an OCI registry |
+| Argo CD | Helm release |
 | `postgres-credentials` Secret | Created by the operator. Deliberately never in Git. |
-| Traefik subnet IDs | Hardcoded in `k8s/platform/traefik/values-public.yaml`. New account means new IDs. |
-| Route 53 alias target | The NLB hostname is hardcoded in `infra/terraform/iam/dns-demo.tf`. Kubernetes generates it, so it cannot be known before Traefik is installed. Two-stage procedure below. |
+| Traefik subnet IDs | Hardcoded in `k8s/platform/traefik/values-public.yaml`. A new account means new IDs. |
+| Route 53 alias target | The load balancer hostname is hardcoded in `infra/terraform/iam/dns-demo.tf`. Kubernetes generates it, so it cannot be known before Traefik is installed. Two-stage procedure in step 3. |
 | Route 53 hosted zone | Pre-existing. Not created by this project. |
-| Operator IP allowlist | `api_public_access_cidrs` has no default and must be supplied. |
+| Operator address allowlist | `api_public_access_cidrs` has no default and must be supplied. |
+| HTTPRoutes, `k8s/base`, cert-manager objects | Applied with `kubectl`. Argo CD manages only the application Deployments and Services. |
 
-### Platform component versions
+### Component versions
 
-Taken from the installation history of the deployed cluster. These are the versions that produced the running system.
+From the installation history of the deployed cluster. Pin these on a rebuild.
 
 | Component | Version | Source |
 |---|---|---|
-| Gateway API CRDs | **`v1.6.1`**, Standard channel | `github.com/kubernetes-sigs/gateway-api` release manifest |
-| cert-manager | chart **`v1.21.2`** | **`oci://quay.io/jetstack/charts/cert-manager`** |
-| Traefik | chart **`41.7.1`** | `https://traefik.github.io/charts` |
+| Gateway API CRDs | `v1.6.1`, Standard channel | `github.com/kubernetes-sigs/gateway-api` release manifest |
+| cert-manager | chart `v1.21.2` | `oci://quay.io/jetstack/charts/cert-manager` |
+| Traefik | chart `41.7.1` | `https://traefik.github.io/charts` |
+| Argo CD | see `k8s/platform/argocd/values.yaml` | `https://argoproj.github.io/argo-helm` |
 
-Pin these on a rebuild. Re-verification commands against a running cluster are given in each step below and collected in [verify.md](verify.md); use them if the cluster has been upgraded since this was written.
-
-These three versions still live outside Terraform and outside any manifest. Keeping them recorded and verified is scope item 05-B in [../blocks/05-gitops.md](../blocks/05-gitops.md).
+These live in this document, not in code, so nothing enforces them. Re-verification commands are given in each step.
 
 ## Operator input required
 
-No default exists for these. Substitute your own values throughout.
+No default exists for these. Substitute your own values.
 
 | Value | Current | Where |
 |---|---|---|
-| AWS account ID | `899088266068` | `infra/terraform/dev.tfvars`, defaults in `iam/variables.tf` and `eks/variables.tf`, `allowed_account_ids` in every `versions.tf` |
-| State bucket name | `wtt-demo-tfstate-899088266068-eu-north-1` | `bootstrap/bootstrap.tfvars` and the `backend` block of all four roots |
+| AWS account ID | `899088266068` | `infra/terraform/dev.tfvars`, variable defaults in `iam` and `eks`, `allowed_account_ids` in every `versions.tf` |
+| State bucket | `wtt-demo-tfstate-899088266068-eu-north-1` | `bootstrap/bootstrap.tfvars` and the backend block of all four roots |
 | Region | `eu-north-1` | throughout |
-| Route 53 hosted zone ID | `Z030020038RZDL2JLFT70` | `iam/cert-manager.tf`, `iam/dns-demo.tf`, both `ClusterIssuer` manifests |
-| Public hostname | `wtt-demo.syachin.de` | `iam/cert-manager.tf`, `iam/dns-demo.tf`, Traefik values, both issuers, both certificates, all `HTTPRoute` objects |
-| ACME contact email | `asyachin@gmail.com` | both `ClusterIssuer` manifests |
-| Operator IP CIDRs | none | `api_public_access_cidrs` |
-| Public subnet IDs | `subnet-0b7a30aac89e73957`, `subnet-063c2d2902dfe90df` | `k8s/platform/traefik/values-public.yaml` |
-| NLB hostname | `ab6ca8d8903fc411db48922a559fdd15-f9a53d15b6b1bfdf.elb.eu-north-1.amazonaws.com` | `iam/dns-demo.tf` |
+| Hosted zone ID | `Z030020038RZDL2JLFT70` | `iam/cert-manager.tf`, `iam/dns-demo.tf`, both `ClusterIssuer` manifests |
+| Public hostname | `wtt-demo.syachin.de` | Terraform, Traefik values, both issuers, both certificates, all four `HTTPRoute` objects |
+| ACME contact email | in both `ClusterIssuer` manifests | `k8s/platform/cert-manager/` |
+| Operator address CIDRs | none | `api_public_access_cidrs` |
+| Public subnet IDs | two values | `k8s/platform/traefik/values-public.yaml` |
+| Load balancer hostname | one value | `iam/dns-demo.tf` |
+| Repository URL | `https://github.com/asyachin/wtt-demo.git` | `k8s/platform/argocd/*.yaml` |
 | PostgreSQL credentials | not in Git | the `postgres-credentials` Secret |
-| GHCR image tags | `vote:9a9bb9e`, `result:f0ea1a0`, `worker:f75d7b7` | `k8s/apps/dev/applications.yaml` |
 
-The backend `bucket` cannot be supplied by a variable: Terraform requires backend configuration to be literal. Either edit the four `versions.tf` and `backend.tf` files, or pass `-backend-config`.
+The backend `bucket` cannot come from a variable — Terraform requires literal backend configuration. Edit the four files, or pass `-backend-config`.
+
+The hostname appears in about ten places and is not parameterised. Grep rather than trusting the list:
+
+```bash
+grep -rn 'wtt-demo\.syachin\.de' infra/ k8s/
+```
 
 ## Prerequisites
 
-| Tool | Required | Verified present on the build host |
-|---|---|---|
-| `terraform` | `>= 1.16.0, < 1.17.0`, enforced by every root | 1.16 |
-| `aws` CLI | v2, with credentials able to create VPC, IAM, EKS, S3 | present |
-| `kubectl` | 1.33 or later for a 1.36 cluster | 1.35 |
-| `helm` | 3.x | 3.20 |
-| `git` | any recent | present |
-| `python3` | 3.11+, for the test suite and scripts | 3.12 |
-| `docker` | only to build images | 29.8 |
-| `openssl`, `dig`, `curl` | for verification | present |
+| Tool | Required |
+|---|---|
+| `terraform` | `>= 1.16.0, < 1.17.0`, enforced by every root |
+| `aws` CLI | v2, with credentials able to create VPC, IAM, EKS and S3 resources |
+| `kubectl` | 1.33 or later for a 1.36 cluster |
+| `helm` | 3.x |
+| `git`, `curl`, `dig`, `openssl` | any recent |
+| `python3` | 3.11+, for the test suite and helper scripts |
+| `docker` | only to build images locally; CI does this normally |
 
-The AWS provider is pinned to exactly `6.68.0`. Lock files are committed, so run `terraform init` without `-upgrade` to reproduce the same provider.
+The AWS provider is pinned to exactly `6.68.0` and lock files are committed, so run `terraform init` without `-upgrade`.
 
-## 1. AWS account preparation
-
-```bash
-aws sts get-caller-identity          # confirm the account ID matches the configuration
-aws configure get region             # or export AWS_REGION=eu-north-1
-```
-
-A Route 53 public hosted zone must already exist for the parent domain, with its name servers delegated. This project creates a record inside an existing zone; it does not create or delegate the zone.
+## 1. AWS account
 
 ```bash
+aws sts get-caller-identity          # confirm the account matches the configuration
+export AWS_REGION=eu-north-1
 aws route53 list-hosted-zones --query 'HostedZones[].{Id:Id,Name:Name}' --output table
 ```
 
+A public hosted zone must already exist for the parent domain, with name servers delegated. This project creates a record inside an existing zone.
+
 ## 2. Terraform state backend
 
-Run once. Uses local state, because the bucket it creates is the backend for everything else.
+Run once. Uses local state, because it creates the bucket that backs everything else.
 
 ```bash
 cd infra/terraform/bootstrap
@@ -91,16 +92,14 @@ terraform init
 terraform apply -var-file=bootstrap.tfvars
 ```
 
-Creates a versioned, AES256-encrypted, private S3 bucket with `BucketOwnerEnforced` ownership and `prevent_destroy` set. Locking is native S3 `use_lockfile = true`; **there is no DynamoDB table.**
+Creates a versioned, AES256-encrypted, private bucket with `BucketOwnerEnforced` and `prevent_destroy`. Locking is native S3 `use_lockfile`; there is no DynamoDB table.
 
-The `bootstrap` root keeps local state. That state file is not committed and is not critical: the bucket can be re-imported if lost.
+## 3. Terraform roots
 
-## 3. Terraform roots, in order
-
-The order is mandatory. `eks` reads both `network` and `iam` through `terraform_remote_state`.
+Order is mandatory. `eks` reads `network` and `iam` through `terraform_remote_state`.
 
 ```
-bootstrap  →  network  →  iam  →  eks
+bootstrap  →  network  →  iam (stage A)  →  eks  →  …  →  iam (stage B)
 ```
 
 ```bash
@@ -110,7 +109,7 @@ terraform apply -var-file=../dev.tfvars
 
 cd ../iam
 terraform init
-# Stage A only. See "The iam root is applied in two stages" below.
+# Stage A only — see below
 terraform apply \
   -target=aws_iam_role.eks_cluster \
   -target=aws_iam_role_policy_attachment.eks_cluster \
@@ -131,32 +130,22 @@ terraform apply -var='api_public_access_cidrs=["YOUR.IP.ADDR.0/24"]'
 
 `api_public_access_cidrs` has no default and its validation rejects both an empty list and `0.0.0.0/0`, so the cluster API cannot be opened to the internet by configuration.
 
-Expect roughly 15 to 20 minutes for the `eks` root: the control plane and the node group dominate.
-
-What each root creates:
-
-| Root | Creates |
-|---|---|
-| `network` | VPC `10.42.0.0/16`, two public and two private subnets across two zones, IGW, one NAT Gateway with an EIP, route tables, and the `kubernetes.io/role/elb` and `kubernetes.io/role/internal-elb` subnet tags |
-| `iam` | EKS cluster role, node role with worker, ECR-pull and CNI policies, EBS CSI role, cert-manager role with the least-privilege Route 53 policy, **and the Route 53 A record** |
-| `eks` | Cluster 1.36, `vpc-cni`, `kube-proxy`, `coredns`, `eks-pod-identity-agent`, `aws-ebs-csi-driver` with a Pod Identity association, the managed node group, and the cert-manager Pod Identity association |
+Expect 15 to 20 minutes for the `eks` root.
 
 ### The iam root is applied in two stages
 
-`infra/terraform/iam/` contains two unrelated groups of resources:
+It holds two unrelated groups:
 
-| Group | Resources | Depends on |
-|---|---|---|
-| IAM roles and policies | `aws_iam_role.eks_cluster`, `aws_iam_role.eks_node`, `aws_iam_role.ebs_csi`, `aws_iam_role.cert_manager`, their policies and attachments | nothing |
-| The public DNS record | `aws_route53_record.wtt_demo` in `dns-demo.tf` | **a Network Load Balancer that Kubernetes creates in step 7** |
+| Group | Depends on |
+|---|---|
+| IAM roles and policies | nothing |
+| `aws_route53_record.wtt_demo` in `dns-demo.tf` | **a load balancer that Kubernetes creates in step 7** |
 
-The record's `alias.name` is the NLB hostname, written in as a string literal. On a clean build that hostname does not exist yet, so the record cannot be created before Traefik is installed. The `eks` root, meanwhile, needs the IAM roles immediately.
+The record's `alias.name` is the load balancer hostname, written in as a literal. On a clean build it does not exist yet, while the `eks` root needs the IAM roles immediately.
 
-The procedure is therefore deterministic and explicit, not trial and error. **Do not run an apply that is expected to fail.**
+**Stage A**, above, applies the eleven IAM resources by address. `-target` is the supported mechanism for a partial apply. Terraform warns that the apply was targeted; that is expected here, not an error. **Do not run an apply that is expected to fail.**
 
-**Stage A — before the `eks` root.** Apply the eleven IAM resources by address, as shown in the commands above. `-target` is the supported mechanism for a partial apply and it creates exactly those resources plus their `data` dependencies. Terraform prints a warning that the apply was targeted and the state may be incomplete; that is expected here and is not an error.
-
-Confirm Stage A produced the three outputs the `eks` root reads:
+Confirm the three outputs the `eks` root reads:
 
 ```bash
 cd infra/terraform/iam
@@ -165,84 +154,37 @@ terraform output eks_node_role_arn
 terraform output ebs_csi_role_arn
 ```
 
-All three must return an ARN. If any is empty, the `eks` root will fail on its `terraform_remote_state` lookup.
+All three must return an ARN. **Stage B** is step 11.
 
-**Stage B — after step 7, once the NLB exists.** Read the hostname, write it into `dns-demo.tf`, then run a full untargeted apply, which converges the root and creates only the record:
+### A dependency that needs no handling
 
-```bash
-NLB=$(kubectl -n traefik get svc traefik \
-  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-echo "$NLB"                       # must be non-empty before continuing
-
-# Edit infra/terraform/iam/dns-demo.tf and set alias.name to that value.
-cd infra/terraform/iam
-terraform plan                    # expect exactly one resource to add
-terraform apply
-```
-
-Stage B is step 12 of this document. The `plan` must show one resource to add and nothing to change or destroy; anything else means Stage A was incomplete.
-
-### The remaining manual dependency
-
-Stage B cannot be automated with the code as it stands. Three facts combine:
-
-1. The NLB is created by Kubernetes, in response to the Traefik `Service` of type `LoadBalancer`. Terraform neither creates it nor can compute its hostname.
-2. `dns-demo.tf` stores that hostname as a literal, so there is no variable to pass and no data source consulted at apply time.
-3. The hostname is generated per load balancer, so it changes whenever the Traefik `Service` is recreated.
-
-The consequences an operator must know:
-
-- A clean rebuild requires a human to copy one value from `kubectl` into a `.tf` file between step 7 and step 12.
-- If the Traefik `Service` or Helm release is ever recreated, the record silently points at a load balancer that no longer exists. `terraform plan` stays empty, because from Terraform's view nothing changed. The site is down and nothing reports it. Detection and recovery are in [troubleshoot.md](troubleshoot.md).
-- `terraform destroy` of the record is safe and is step 2 of [teardown.md](teardown.md).
-
-Two permanent fixes exist, both deferred because they change Terraform or Kubernetes and this documentation task does not:
-
-| Fix | Effect |
-|---|---|
-| Deploy `external-dns`, and let it maintain the record from the `Gateway` or `Service` | Moves DNS ownership to Kubernetes, where the load balancer already lives. Removes the manual step and the silent-breakage class entirely. |
-| Keep Terraform ownership, but replace the literal with a `data "aws_lb"` lookup filtered by tag, and gate the record behind a `count` variable | Keeps the record in Terraform. Still needs two stages, but Stage B becomes `-var=create_dns_record=true` with no file edit. |
-
-The first is the better answer, and it also removes the need for the record to live in the `iam` root at all. Tracked in [../decisions/0017-terraform-multi-root.md](../decisions/0017-terraform-multi-root.md) and [../roadmap.md](../roadmap.md#deferred-beyond-the-interview).
-
-### A dependency that needs no special handling
-
-`eks/cert-manager-identity.tf` creates a Pod Identity association naming the service account `cert-manager` in namespace `cert-manager`, which does not exist until step 6. This is safe: an association may be created before its service account exists and simply begins working when the service account appears. No staging is required.
+`eks/cert-manager-identity.tf` creates a Pod Identity association naming a service account that does not exist until step 5. That is safe: an association may precede its service account and begins working when the service account appears.
 
 ## 4. Cluster access
 
 ```bash
 aws eks update-kubeconfig --region eu-north-1 --name wtt-demo-eks
-kubectl get nodes -o wide            # expect 2 Ready, no public addresses
-kubectl get storageclass             # expect gp3
+kubectl get nodes -o wide            # 2 Ready, no public addresses
+kubectl get storageclass             # gp3
 ```
 
 Generated on demand. Never commit a kubeconfig.
 
-## 5. Gateway API CRDs — MANUAL
+## 5. Gateway API CRDs and cert-manager — MANUAL
 
-Must be installed before Traefik, which will not start its Gateway provider without them.
+CRDs must exist before Traefik, which will not start its Gateway provider without them.
 
 ```bash
 kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/standard-install.yaml
-
 kubectl get crd | grep gateway.networking.k8s.io
-```
 
-Standard channel is sufficient. `HTTPRoute`, `Gateway` and `GatewayClass` are all in it; nothing here needs the experimental channel.
-
-Re-verify against a running cluster:
-
-```bash
 kubectl get crd gateways.gateway.networking.k8s.io \
-  -o jsonpath='{.metadata.annotations.gateway\.networking\.k8s\.io/bundle-version}{"\n"}'
+  -o jsonpath='{.metadata.annotations.gateway\.networking\.k8s\.io/bundle-version}{"\n"}'   # v1.6.1
 ```
 
-Expect `v1.6.1`. A mismatch means the cluster was upgraded after this document was written; record the new value here.
+Standard channel is sufficient; nothing here needs the experimental channel.
 
-## 6. cert-manager — MANUAL
-
-Installed from the OCI registry, not from a classic Helm repository, so there is no `helm repo add` step:
+cert-manager comes from an OCI registry, so there is no `helm repo add`:
 
 ```bash
 helm install cert-manager oci://quay.io/jetstack/charts/cert-manager \
@@ -250,25 +192,26 @@ helm install cert-manager oci://quay.io/jetstack/charts/cert-manager \
   --version v1.21.2 \
   --set crds.enabled=true
 
-kubectl -n cert-manager get pods     # controller, webhook, cainjector all Running
+kubectl -n cert-manager get pods     # controller, webhook, cainjector Running
+helm list -n cert-manager            # chart cert-manager-v1.21.2
 ```
 
-Re-verify against a running cluster:
-
-```bash
-helm list -n cert-manager -o json | python3 -c \
-  'import json,sys; [print(r["name"], r["chart"], r["app_version"]) for r in json.load(sys.stdin)]'
-```
-
-Expect chart `cert-manager-v1.21.2`.
-
-The service account must be named `cert-manager` in namespace `cert-manager` to match the Pod Identity association created in step 3. That is the chart default.
-
-Pod Identity requires the `eks-pod-identity-agent` add-on, which step 3 installed. Confirm credentials are reaching the pod before relying on it:
+The service account must be named `cert-manager` in namespace `cert-manager` to match the Pod Identity association from step 3. That is the chart default. Confirm credentials reach the pod:
 
 ```bash
 kubectl -n cert-manager exec deploy/cert-manager -- env | grep -i AWS_CONTAINER
 ```
+
+## 6. Base Kubernetes resources
+
+```bash
+kubectl apply -f k8s/base/namespaces.yaml
+kubectl apply -f k8s/base/storage/gp3.yaml
+```
+
+`vote-prod` is created and intentionally left empty.
+
+> `gp3.yaml` sets `reclaimPolicy: Delete`. Deleting a claim later destroys the volume and all data. [Block 06](../roadmap.md#next-block) addresses this; consider applying 06-A immediately after step 8.
 
 ## 7. Traefik — MANUAL
 
@@ -276,75 +219,46 @@ kubectl -n cert-manager exec deploy/cert-manager -- env | grep -i AWS_CONTAINER
 helm repo add traefik https://traefik.github.io/charts
 helm repo update
 
-# Edit k8s/platform/traefik/values-public.yaml first:
-# replace the two subnet IDs with your public subnet IDs.
-kubectl get subnets 2>/dev/null || \
-  aws ec2 describe-subnets --region eu-north-1 \
-    --filters "Name=tag:Name,Values=wtt-demo-public-*" \
-    --query 'Subnets[].{Id:SubnetId,AZ:AvailabilityZone}' --output table
+# Replace the two subnet IDs in values-public.yaml first
+aws ec2 describe-subnets --region eu-north-1 \
+  --filters "Name=tag:Name,Values=wtt-demo-public-*" \
+  --query 'Subnets[].{Id:SubnetId,AZ:AvailabilityZone}' --output table
 
 helm install traefik traefik/traefik \
   --namespace traefik --create-namespace \
   --version 41.7.1 \
   -f k8s/platform/traefik/values.yaml \
   -f k8s/platform/traefik/values-public.yaml
+
+helm list -n traefik                 # chart traefik-41.7.1
 ```
 
-Chart `41.7.1`, which matches the comment at the top of `values.yaml`. The original install command was not captured, so the command above is reconstructed from the two values files that exist in the repository. Re-verify:
+`values.yaml` enables only the Gateway API provider and creates a `GatewayClass` plus a `Gateway` with listeners `web:8000` and `websecure:8443`. `values-public.yaml` switches the Service to `LoadBalancer` with Network Load Balancer annotations.
 
-```bash
-helm list -n traefik -o json | python3 -c \
-  'import json,sys; [print(r["name"], r["chart"], r["app_version"]) for r in json.load(sys.stdin)]'
-```
-
-Expect chart `traefik-41.7.1`.
-
-`values.yaml` enables only the Gateway API provider, disables the Ingress and CRD providers, and creates a `GatewayClass` named `traefik` plus a `Gateway` named `traefik-gateway` with listeners `web:8000` HTTP and `websecure:8443` HTTPS. `values-public.yaml` switches the Service to `LoadBalancer` with NLB annotations.
-
-The `websecure` listener references Secret `wtt-demo-tls`, which does not exist until step 9, so the Gateway will not be fully `Programmed` yet. That is expected.
+The `websecure` listener references Secret `wtt-demo-tls`, which does not exist until step 10, so the Gateway will not be fully `Programmed` yet. Expected.
 
 ```bash
 kubectl -n traefik get svc traefik -o jsonpath='{.status.loadBalancer.ingress[0].hostname}{"\n"}'
 ```
 
-**Record that hostname.** It is the alias target for step 10 and the value currently hardcoded in `iam/dns-demo.tf`.
+**Record that hostname.** It is the alias target for step 11.
 
-## 8. Base Kubernetes resources
+## 8. PostgreSQL credentials and data services — MANUAL
 
-```bash
-kubectl apply -f k8s/base/namespaces.yaml
-kubectl apply -f k8s/base/storage/gp3.yaml
-```
-
-Creates namespaces `vote-dev` and `vote-prod`, and the `gp3` StorageClass.
-
-`vote-prod` is created and intentionally left empty. It is not a production environment; see [../architecture.md](../architecture.md#environment-model).
-
-> `k8s/base/storage/gp3.yaml` sets `reclaimPolicy: Delete`. Deleting the PVC later destroys the volume and all data. [Block 06](../blocks/06-data-durability.md) addresses this.
-
-## 9. PostgreSQL credentials — MANUAL
-
-The Secret is deliberately not in Git. Create it before the data services, because the StatefulSet consumes it with `envFrom`.
+The Secret is deliberately not in Git, and must exist before the StatefulSet, which consumes it with `envFrom`.
 
 ```bash
 kubectl -n vote-dev create secret generic postgres-credentials \
   --from-literal=POSTGRES_USER='<user>' \
   --from-literal=POSTGRES_PASSWORD="$(python3 scripts/pass.py --length 32)" \
   --from-literal=POSTGRES_DB='<database>'
-```
 
-All three keys are required. `postgres` reads all of them via `envFrom`; `result` and `worker` reference them individually with `secretKeyRef`.
-
-Verify the key names without printing any value:
-
-```bash
+# Verify key names without printing values
 kubectl -n vote-dev get secret postgres-credentials \
   -o jsonpath='{range $k,$v := .data}{$k}{"\n"}{end}'
 ```
 
-Never echo the password, never pass it on a shared shell command line, and never commit it. Rotation: `scripts/rotate_k8s_postgres_password.py`.
-
-## 10. Data services
+All three keys are required. Never echo the password, never pass it on a shared command line, never commit it. Rotation: `scripts/rotate_k8s_postgres_password.py`.
 
 ```bash
 kubectl apply -f k8s/base/postgres/
@@ -352,19 +266,54 @@ kubectl apply -f k8s/base/redis/
 kubectl -n vote-dev get pods -w
 ```
 
-PostgreSQL binds a 5 GiB `gp3` PVC. Because `volumeBindingMode: WaitForFirstConsumer`, the volume is created in whichever availability zone the pod is scheduled into — and from then on the pod can only run in that zone.
+Because `volumeBindingMode: WaitForFirstConsumer`, the volume is created in the zone where the pod is scheduled, and from then on the pod can run only in that zone.
 
-## 11. TLS
+## 9. Application and routes
+
+Images are public in GHCR, so no pull secret is needed.
+
+```bash
+kubectl apply -f k8s/apps/dev/applications.yaml
+kubectl apply -f k8s/apps/dev/httproutes.yaml
+kubectl apply -f k8s/apps/dev/result-redirect.yaml
+kubectl apply -f k8s/apps/dev/http-to-https.yaml
+kubectl -n vote-dev get pods
+```
+
+Confirm the images are reachable first:
+
+```bash
+for s in vote result worker; do
+  tag=$(grep -oE "wtt-demo/$s:[^ ]+" k8s/apps/dev/applications.yaml | head -1)
+  echo "== $tag"; docker manifest inspect "ghcr.io/asyachin/$tag" >/dev/null && echo ok
+done
+```
+
+To rebuild an image by hand, if CI is unavailable:
+
+```bash
+cd app/vote
+docker build -t ghcr.io/asyachin/wtt-demo/vote:manual-$(git rev-parse --short=7 HEAD) .
+docker push ghcr.io/asyachin/wtt-demo/vote:manual-$(git rev-parse --short=7 HEAD)
+```
+
+Normally CI builds, scans and publishes on every push to `dev`; see [../architecture.md](../architecture.md#delivery-pipeline).
+
+### Route order matters within the application
+
+The two rules inside the `result` route are order-sensitive: `/result/socket.io` must be matched before `/result`, and only `/result` carries the `URLRewrite`. The redirect route attaches only to the `web` listener; the application routes attach only to `websecure`.
+
+## 10. TLS
 
 Staging first. Let's Encrypt production permits five duplicate certificates per week, and a misconfigured solver exhausts that in an afternoon.
 
 ```bash
 kubectl apply -f k8s/platform/cert-manager/clusterissuer-staging.yaml
 kubectl apply -f k8s/platform/cert-manager/certificate-staging.yaml
-kubectl -n traefik get certificate -w            # wtt-demo-staging → Ready=True
+kubectl -n traefik get certificate -w          # wtt-demo-staging Ready=True
 ```
 
-If it does not become ready, the solver is the usual cause:
+If it stalls, the solver is the usual cause:
 
 ```bash
 kubectl -n traefik get certificaterequest,order,challenge
@@ -376,16 +325,12 @@ Only once staging works:
 ```bash
 kubectl apply -f k8s/platform/cert-manager/clusterissuer-production.yaml
 kubectl apply -f k8s/platform/cert-manager/certificate-production.yaml
-kubectl -n traefik get certificate wtt-demo -w   # Ready=True, Secret wtt-demo-tls created
+kubectl -n traefik get certificate wtt-demo -w  # Ready=True, Secret wtt-demo-tls created
 ```
-
-Both issuers use a DNS-01 Route 53 solver with a `dnsNames` selector, authenticating through the Pod Identity association from step 3. The IAM policy permits only `TXT` changes to exactly `_acme-challenge.<hostname>` in one zone.
 
 Certificates cover one name. There is no wildcard.
 
-## 12. Route 53 record — Stage B of the iam root
-
-This completes the two-stage apply described in step 3. The NLB now exists, so its hostname is known and the record can be created.
+## 11. Route 53 record — stage B of the iam root
 
 ```bash
 NLB=$(kubectl -n traefik get svc traefik \
@@ -399,100 +344,98 @@ Set `alias.name` in `infra/terraform/iam/dns-demo.tf` to that value, then run a 
 cd infra/terraform/iam
 terraform plan                    # expect exactly 1 to add, 0 to change, 0 to destroy
 terraform apply
+
+dig +short wtt-demo.syachin.de    # two addresses, one per zone
 ```
 
-If the plan proposes anything other than adding `aws_route53_record.wtt_demo`, Stage A was incomplete. Re-read step 3 rather than approving the plan.
+If the plan proposes anything else, stage A was incomplete.
 
-```bash
-dig +short wtt-demo.syachin.de                   # two addresses, one per zone
-```
-
-The alias also needs the NLB's canonical hosted zone ID, which is region-specific and is a property of the load balancer rather than of this project. `Z1UDT6IFJ4EJM` is the value for NLBs in `eu-north-1`. For another region, read it from the load balancer:
+The alias also needs the load balancer's canonical hosted zone ID, which is region-specific. `Z1UDT6IFJ4EJM` is the value for Network Load Balancers in `eu-north-1`. For another region:
 
 ```bash
 aws elbv2 describe-load-balancers --region "$AWS_REGION" \
   --query "LoadBalancers[?DNSName=='$NLB'].CanonicalHostedZoneId" --output text
 ```
 
-From this point the record is a literal that Terraform will not update by itself. Whenever the Traefik `Service` is recreated, step 12 must be repeated; see the manual dependency note in step 3 and the detection procedure in [troubleshoot.md](troubleshoot.md).
+### The remaining manual dependency
 
-## 13. Application
+Stage B cannot be automated as the code stands, because the hostname is a literal that Terraform neither computes nor consults a data source for. Consequences:
 
-```bash
-kubectl apply -f k8s/apps/dev/applications.yaml
-kubectl apply -f k8s/apps/dev/httproutes.yaml
-kubectl apply -f k8s/apps/dev/result-redirect.yaml
-kubectl -n vote-dev get pods
-```
+- A clean rebuild needs a human to copy one value from `kubectl` into a `.tf` file between step 7 and step 11.
+- If the Traefik Service is ever recreated, the record silently points at a load balancer that no longer exists, and `terraform plan` stays empty. Detection in [operate.md](operate.md).
 
-Images are public in GHCR, so no pull secret is needed:
+Two permanent fixes, both deferred because they change Terraform or Kubernetes:
 
-| Image | Tag |
+| Fix | Effect |
 |---|---|
-| `ghcr.io/asyachin/wtt-demo/vote` | `9a9bb9e` |
-| `ghcr.io/asyachin/wtt-demo/result` | `f0ea1a0` |
-| `ghcr.io/asyachin/wtt-demo/worker` | `f75d7b7` |
+| Deploy `external-dns` and let it maintain the record from the `Gateway` | Moves DNS ownership to Kubernetes, where the load balancer already lives. Removes the manual step and the silent-breakage class. |
+| Keep Terraform ownership, replace the literal with a `data "aws_lb"` lookup, gate the record behind a `count` variable | Still two stages, but stage B becomes a variable rather than a file edit |
 
-Confirm they are reachable before applying:
+The first is better and would also move the record out of the `iam` root. See [../decisions/0017-terraform-multi-root.md](../decisions/0017-terraform-multi-root.md).
 
-```bash
-for i in vote:9a9bb9e result:f0ea1a0 worker:f75d7b7; do
-  echo "== $i"; docker manifest inspect "ghcr.io/asyachin/wtt-demo/$i" >/dev/null && echo ok
-done
-```
-
-There is no CI, so images are built by hand. To rebuild one:
+## 12. Argo CD — MANUAL
 
 ```bash
-cd app/vote
-docker build -t ghcr.io/asyachin/wtt-demo/vote:$(git rev-parse --short=7 HEAD) .
-docker push ghcr.io/asyachin/wtt-demo/vote:$(git rev-parse --short=7 HEAD)
+helm repo add argo https://argoproj.github.io/argo-helm
+helm repo update
+helm install argocd argo/argo-cd \
+  --namespace argocd --create-namespace \
+  -f k8s/platform/argocd/values.yaml
+
+kubectl -n argocd get pods
 ```
 
-Then update the tag in `k8s/apps/dev/applications.yaml` and apply. The tag convention is the short SHA of the commit whose source produced the image, which is what makes a running image traceable to a commit.
-
-### Apply order within the application
-
-`httproutes.yaml` and `result-redirect.yaml` can be applied in any order, but the two rules inside the `result` route are order-sensitive as written: `/result/socket.io` must be matched before `/result`, and only `/result` carries the `URLRewrite`. See [../lessons.md](../lessons.md).
-
-## 14. Verify
-
-Run the whole of [verify.md](verify.md). The minimum:
+The values set `server.service.type: ClusterIP` and `server.insecure: true`. There is **no public route**: access is by port-forward only.
 
 ```bash
-curl -sS -o /dev/null -w '%{http_code}\n' https://wtt-demo.syachin.de/
-curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://wtt-demo.syachin.de/result
-curl -sS -o /dev/null -w '%{http_code}\n' https://wtt-demo.syachin.de/result/
+kubectl -n argocd port-forward svc/argocd-server 8080:80
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d; echo
 ```
 
-Then open both pages in a browser with the console visible, vote, and watch the count change. A status code does not prove the page works; that is the lesson from the `/result` and mixed-content defects.
+Do not record that password anywhere in the repository.
+
+Then register the applications:
+
+```bash
+kubectl apply -f k8s/platform/argocd/demo-application.yaml     # isolated proving workload
+kubectl apply -f k8s/platform/argocd/vote-dev-application.yaml # the application itself
+kubectl -n argocd get applications
+```
+
+Both Applications have `automated` sync with `selfHeal: true` and **`prune: false`**. On a rebuild the resources already exist from step 9, so Argo CD adopts them rather than creating them. Confirm adoption did not replace anything:
+
+```bash
+kubectl -n vote-dev get deploy,svc -o custom-columns='KIND:.kind,NAME:.metadata.name,UID:.metadata.uid'
+```
+
+Compare the UIDs before and after. A changed UID means a resource was recreated.
+
+## 13. Verify
+
+Run [operate.md](operate.md) section 1, then open both pages in a browser with the console visible, vote, and watch the count change. A status code does not prove the page works — that lesson came from the `/result` and mixed-content defects.
 
 ## Adapting to another organisation
 
 | Change | Where |
 |---|---|
 | Account, region, project name | `infra/terraform/dev.tfvars`, variable defaults, `allowed_account_ids` in all four `versions.tf`, backend blocks |
-| State bucket | `bootstrap/bootstrap.tfvars` and the backend block of all four roots. Must be globally unique. |
-| Hostname | `iam/cert-manager.tf`, `iam/dns-demo.tf`, `k8s/platform/traefik/values.yaml`, both issuers, both certificates, all three `HTTPRoute` objects |
+| State bucket | `bootstrap/bootstrap.tfvars` and the backend block of all four roots. Globally unique. |
+| Hostname | Terraform, Traefik values, both issuers, both certificates, all four `HTTPRoute` objects |
 | Hosted zone | `iam/cert-manager.tf`, `iam/dns-demo.tf`, both issuers |
 | ACME email | both `ClusterIssuer` manifests |
 | Subnet IDs | `k8s/platform/traefik/values-public.yaml` |
-| Image registry | `k8s/apps/dev/applications.yaml` |
-| Node size or capacity type | `eks/variables.tf`. Mind the VPC CNI pod-density limit; see [../lessons.md](../lessons.md). |
-
-The hostname appears in roughly ten places across Terraform and manifests. It is not parameterised. Grep for it rather than trusting this list:
-
-```bash
-grep -rn 'wtt-demo\.syachin\.de' infra/ k8s/
-```
+| Image registry | `k8s/apps/dev/applications.yaml`, and the workflow in `.github/workflows/ci-images.yml` |
+| Git repository | `k8s/platform/argocd/*.yaml` |
+| Node size or capacity type | `eks/variables.tf`. Mind the VPC CNI pod-density limit. |
 
 ## Known reproducibility gaps
 
 | Gap | Effect | Owner |
 |---|---|---|
-| Three chart and CRD versions pinned in prose, not in code | A rebuild is version-identical only if the operator follows this document; nothing enforces it | Block 05, item 05-B |
-| Route 53 alias depends on a Kubernetes-generated hostname | The first apply of the `iam` root cannot succeed on a clean build | Deferred |
+| Four chart and CRD versions pinned in prose, not in code | A rebuild is version-identical only if the operator follows this document | Future work |
+| Route 53 alias depends on a Kubernetes-generated hostname | A human step between step 7 and step 11 | Deferred |
 | Subnet IDs hardcoded in Traefik values | Must be edited for a new account | Deferred |
 | The Secret is manual | A rebuild stops until an operator creates it | [ADR 0020](../decisions/0020-manual-postgres-secret.md) |
-| No CI | Images are built and pushed by hand | Block 07 |
+| Argo CD manages only Deployments and Services | Everything else needs `kubectl apply` | Deferred |
 | **This procedure has never been executed end to end** | Unknown unknowns | Block 10 |
