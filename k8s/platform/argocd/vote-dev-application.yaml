@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: vote-dev
+  namespace: argocd
+spec:
+  sourceRepos:
+    - https://github.com/asyachin/wtt-demo.git
+  destinations:
+    - namespace: vote-dev
+      server: https://kubernetes.default.svc
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: Service
+    - group: apps
+      kind: Deployment
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vote-dev-apps
+  namespace: argocd
+spec:
+  project: vote-dev
+  source:
+    repoURL: https://github.com/asyachin/wtt-demo.git
+    targetRevision: dev
+    path: k8s/apps/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vote-dev
+  syncPolicy:
+    syncOptions:
+      - PruneLast=true
