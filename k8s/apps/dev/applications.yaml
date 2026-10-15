@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: vote
-          image: ghcr.io/asyachin/wtt-demo/vote:2026.10.15-1339-build.8-a1-a66f5f2
+          image: ghcr.io/asyachin/wtt-demo/vote:2026.10.15-1558-build.21-a1-5ccdb9a
           imagePullPolicy: Always
           ports:
             - containerPort: 80
