@@ -12,7 +12,7 @@
 
 Make Git the mechanism that applies `k8s/` to the cluster, adopting resources that are **already running and serving public traffic**, with no interruption and no resource recreation.
 
-A second outcome matters as much: the Gateway API CRDs, Traefik and cert-manager were installed by hand and their versions exist only in shell history. The cluster cannot currently be rebuilt from Git alone. This block records them.
+A second outcome matters as much: the Gateway API CRDs, Traefik and cert-manager were installed by hand. Their versions are now known and written down in [../operations/reproduce.md](../operations/reproduce.md) — Gateway API `v1.6.1`, Traefik chart `41.7.1`, cert-manager chart `v1.21.2` from `oci://quay.io/jetstack/charts/cert-manager` — but they live in prose, not in code, so nothing enforces them. This block brings them under version control.
 
 ## Governing constraint
 
@@ -31,7 +31,7 @@ Every decision below is therefore biased toward **inspection before action**:
 | ID | Item |
 |---|---|
 | 05-A | Install Argo CD by Helm, internally only, with chart version, values and the exact command committed to `k8s/platform/argocd/` |
-| 05-B | Record the existing manual bootstrap: Gateway API CRD version, Traefik chart `41.7.1` and its values, cert-manager chart version, in [../operations/reproduce.md](../operations/reproduce.md) |
+| 05-B | Bring the manual bootstrap under version control: pin Gateway API `v1.6.1`, Traefik chart `41.7.1` and cert-manager chart `v1.21.2` in code rather than in prose, and re-verify each against the cluster |
 | 05-C | An `AppProject` restricting source repository, destination namespaces and resource kinds |
 | 05-D | One `Application` per path, each with `syncPolicy` manual at creation |
 | 05-E | Staged adoption: inspect, then sync manually, then enable self-healing |
@@ -51,12 +51,13 @@ Every decision below is therefore biased toward **inspection before action**:
 ## Prerequisites
 
 - Block 04 `CLOSED`, so the demonstration is in a known-good state before anything is adopted.
-- Chart versions and CRD versions for Traefik, cert-manager and the Gateway API, read from the cluster:
+- The recorded versions re-verified against the running cluster, in case it has been upgraded since they were written down:
 
 ```bash
-helm list -A
+helm list -A                                      # expect traefik-41.7.1, cert-manager-v1.21.2
 kubectl get crd gateways.gateway.networking.k8s.io \
   -o jsonpath='{.metadata.annotations.gateway\.networking\.k8s\.io/bundle-version}{"\n"}'
+                                                  # expect v1.6.1
 ```
 
 - A recorded inventory of every resource that will be adopted, captured **before** any Argo CD object is created:
@@ -158,7 +159,7 @@ The self-healing proof is the one that matters, and an annotation demonstrates i
 | 11 | The `AppProject` restricts scope | Attempt an `Application` targeting `kube-system` | Rejected by the project |
 | 12 | Argo CD is not publicly reachable | `kubectl -n argocd get svc`, and `dig argocd.wtt-demo.syachin.de` | No `LoadBalancer`, no public DNS record. Access by port-forward. |
 | 13 | No secret added to Git | Review the branch diff, and a credential scan | Clean. The Argo CD admin password is never committed. |
-| 14 | The manual bootstrap is recorded | [../operations/reproduce.md](../operations/reproduce.md) names the Gateway API CRD version, Traefik chart version and cert-manager chart version | All three present, matching what `helm list -A` reports |
+| 14 | The manual bootstrap is pinned in code, not only in prose | The repository declares Gateway API `v1.6.1`, Traefik `41.7.1` and cert-manager `v1.21.2` in a file an apply consumes | All three pinned, and matching what `helm list -A` and the CRD annotation report |
 | 15 | Ownership documented | 05-F table | Every resource in `k8s/` and every platform component has a named owner |
 
 ## Risks and limitations

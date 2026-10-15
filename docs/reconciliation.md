@@ -99,7 +99,7 @@ Deviation types: **As planned** · **Different** · **Deferred** · **Not starte
 | `/result` and `/result/` behave differently in a browser, because relative asset paths resolve against the request path. HTTP 200 did not reveal it. | [lessons.md](lessons.md), fixed in `6ea8755` |
 | The vote page loaded jQuery over plain `http://`, blocked as mixed active content on an HTTPS page. The page rendered and returned 200 throughout. | [application.md](application.md#defect-register) D5, fixed in `9a9bb9e` and `a4d979f` |
 | `t3.small` is not viable because the AWS VPC CNI caps pods per node by ENI capacity, not by CPU or memory | [lessons.md](lessons.md) |
-| Gateway API CRDs, Traefik and cert-manager were installed by hand, and their versions exist only in shell history | [operations/reproduce.md](operations/reproduce.md), scope item 05-B |
+| Gateway API CRDs, Traefik and cert-manager were installed by hand, outside Terraform and outside any manifest. Versions are now recorded as `v1.6.1`, `41.7.1` and `v1.21.2`, but in prose rather than in code. | [operations/reproduce.md](operations/reproduce.md), scope item 05-B |
 | A repository hygiene test asserts on paths from the abandoned layout and therefore cannot fail | [application.md](application.md#not-an-application-defect-tracked-here-for-completeness) T1, Block 04 |
 | `jquery.cookie` is loaded on every page view and never called; the cookie is set server-side by Flask | [application.md](application.md#defect-register) D5b |
 | The voted-state highlight renders only on the POST response, never after a reload. Any acceptance test written against a reload would be wrong. | [blocks/04-demo-quality-gate.md](blocks/04-demo-quality-gate.md) |

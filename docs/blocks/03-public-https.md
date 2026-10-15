@@ -21,7 +21,7 @@ Make the demonstration reachable from the internet over HTTPS with a certificate
 
 ### What was built
 
-1. **cert-manager** installed by Helm. Chart version not recorded — a reproducibility gap carried into [Block 05](05-gitops.md) as scope item 05-B.
+1. **cert-manager** installed by Helm, chart `v1.21.2` from `oci://quay.io/jetstack/charts/cert-manager`. The version is recorded in [../operations/reproduce.md](../operations/reproduce.md), but nothing in the repository enforces it; that is scope item 05-B in [Block 05](05-gitops.md).
 2. **An IAM role with a least-privilege Route 53 policy**, `infra/terraform/iam/cert-manager.tf`. Scoped by three condition keys: action limited to `route53:ChangeResourceRecordSets`, record type restricted to `TXT`, and record name restricted to exactly `_acme-challenge.wtt-demo.syachin.de`, in one hosted zone. A compromised cert-manager pod can manipulate one TXT record name and nothing else.
 3. **A Pod Identity association**, `infra/terraform/eks/cert-manager-identity.tf`, binding that role to the `cert-manager` service account, with `depends_on` the Pod Identity agent add-on.
 4. **Two `ClusterIssuer` objects**, staging and production, each with a DNS-01 Route 53 solver selected by `dnsNames`.

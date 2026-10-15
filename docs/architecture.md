@@ -251,9 +251,9 @@ Knowing which tool owns which object is what makes the platform safe to change.
 | VPC, subnets, NAT, IAM roles, EKS cluster, node group, EKS add-ons | Terraform | Change through `terraform apply` |
 | Pod Identity associations | Terraform | Declared in the `eks` root |
 | Route 53 A record | Terraform, **but the target value is produced by Kubernetes** | Fragile, see above |
-| Gateway API CRDs | **MANUAL** `kubectl apply` | Version not recorded in the repository |
-| Traefik, including `GatewayClass`, `Gateway` and the NLB | **MANUAL** Helm release, chart `41.7.1` | Values in `k8s/platform/traefik/`, install command not recorded |
-| cert-manager | **MANUAL** Helm release | Chart version not recorded |
+| Gateway API CRDs | **MANUAL** `kubectl apply` | Standard channel `v1.6.1`. Version recorded in `operations/reproduce.md`, not in the repository code. |
+| Traefik, including `GatewayClass`, `Gateway` and the NLB | **MANUAL** Helm release, chart `41.7.1` | Values in `k8s/platform/traefik/`. The original install command was not captured and is reconstructed. |
+| cert-manager | **MANUAL** Helm release, chart `v1.21.2` from `oci://quay.io/jetstack/charts/cert-manager` | Configuration objects in `k8s/platform/cert-manager/` |
 | `ClusterIssuer`, `Certificate` | `kubectl apply` from `k8s/platform/cert-manager/` | In Git |
 | Namespaces, StorageClass, PostgreSQL, Redis | `kubectl apply` from `k8s/base/` | In Git |
 | Application Deployments, Services, HTTPRoutes | `kubectl apply` from `k8s/apps/dev/` | In Git |
@@ -261,7 +261,7 @@ Knowing which tool owns which object is what makes the platform safe to change.
 
 The NLB is owned by the Traefik `Service`, not by Terraform. `terraform destroy` will not remove it, and deleting the Traefik release will. This reverses the usual teardown intuition and is the first step in [operations/teardown.md](operations/teardown.md).
 
-Three platform components are installed by hand with versions that exist only in shell history. The cluster cannot currently be reproduced from Git alone. Recording them is scope item 05-B in [blocks/05-gitops.md](blocks/05-gitops.md), and the known values are captured in [operations/reproduce.md](operations/reproduce.md).
+Three platform components are installed by hand. Their versions are known and recorded — Gateway API CRDs `v1.6.1`, Traefik chart `41.7.1`, cert-manager chart `v1.21.2` — but they live in [operations/reproduce.md](operations/reproduce.md) rather than in the repository code, so no apply enforces them. Bringing them under version control is scope item 05-B in [blocks/05-gitops.md](blocks/05-gitops.md).
 
 ## Cost estimate
 

@@ -36,7 +36,7 @@ Rationale recorded retrospectively in [ADR 0020](../decisions/0020-manual-postgr
 
 ### Routing
 
-Traefik was installed by Helm, chart `41.7.1`, with values committed to `k8s/platform/traefik/values.yaml`. The install command itself was not recorded, which is a reproducibility gap carried into [Block 05](05-gitops.md) as scope item 05-B.
+Traefik was installed by Helm, chart `41.7.1`, with values committed to `k8s/platform/traefik/values.yaml`. The original install command was not captured; a reconstructed equivalent is in [../operations/reproduce.md](../operations/reproduce.md). Pinning the chart version in code rather than in prose is scope item 05-B in [Block 05](05-gitops.md).
 
 The chart is configured with only the Gateway API provider enabled; the Ingress and CRD providers are switched off. It creates a `GatewayClass` named `traefik` and a `Gateway` named `traefik-gateway` with two listeners, `web:8000` HTTP and `websecure:8443` HTTPS, both accepting routes from all namespaces.
 
@@ -92,7 +92,7 @@ The last command matters: nothing has confirmed from the cluster that the Secret
 - All containers run as root. No namespace carries Pod Security labels.
 - No NetworkPolicy. `vote` can reach PostgreSQL directly, with no reason to.
 - The Secret is a manual object. A cluster rebuild requires an operator to recreate it before the application can start.
-- Traefik was installed by hand and the command was not recorded.
+- Traefik was installed by hand. The chart version `41.7.1` is recorded, but nothing in the repository enforces it.
 - Application defects D1, D2, D4, D13 and D15 remain open; see [../application.md](../application.md#defect-register).
 
 ## Definition of Done

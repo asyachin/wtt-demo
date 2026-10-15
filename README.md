@@ -17,13 +17,15 @@ Public HTTPS with a Let's Encrypt production certificate. The trailing slash on 
 
 The application is deliberately small and is not the point. The engineering work around it is:
 
-- Reproducible AWS infrastructure in Terraform, split into four state-isolated roots.
+- AWS infrastructure in Terraform, split into four state-isolated roots with remote state and locking.
 - An EKS cluster with worker nodes in private subnets and a public load balancer.
 - Workload identity through EKS Pod Identity, with no static AWS credentials anywhere.
 - Ingress through the Kubernetes Gateway API rather than vendor annotations.
 - Automated TLS with cert-manager and a Route 53 DNS-01 solver scoped to a single record name.
-- Stateful workload on an EBS-backed volume.
+- A stateful workload on an EBS-backed volume, with persistence verified across a pod restart.
 - A delivery process with per-block acceptance criteria, recorded evidence, and honest status.
+
+The rebuild procedure is documented step by step in [docs/operations/reproduce.md](docs/operations/reproduce.md), including the steps that are still manual. It has not yet been executed against an empty account, so it is a documented procedure rather than a proven one — that is Block 10.
 
 ## Architecture
 
@@ -87,9 +89,9 @@ Full detail, including the identity model and the TLS path: [docs/architecture.m
 | Infrastructure as code | Terraform 1.16, AWS provider 6.68.0 | VPC, NAT, IAM, EKS, add-ons. Four roots with S3 remote state and native S3 locking. |
 | Orchestration | Amazon EKS 1.36 | Two `t3.large` On-Demand nodes in private subnets, two availability zones |
 | Identity | EKS Pod Identity | Scoped IAM for the EBS CSI driver and cert-manager. No static keys. |
-| Ingress | Kubernetes Gateway API, Traefik v3 | `GatewayClass`, one `Gateway`, three `HTTPRoute` objects. TLS terminates at Traefik. |
+| Ingress | Kubernetes Gateway API `v1.6.1`, Traefik chart `41.7.1` | `GatewayClass`, one `Gateway`, three `HTTPRoute` objects. TLS terminates at Traefik. |
 | Load balancing | AWS Network Load Balancer | Created by the Traefik `Service`, layer 4, internet-facing |
-| DNS and TLS | Route 53, cert-manager, Let's Encrypt | Production certificate via DNS-01, least-privilege solver |
+| DNS and TLS | Route 53, cert-manager chart `v1.21.2`, Let's Encrypt | Production certificate via DNS-01, least-privilege solver |
 | Storage | EBS CSI driver, `gp3` StorageClass | Encrypted 5 GiB PVC for PostgreSQL |
 | Application | Flask, Redis, .NET, PostgreSQL 17, Node.js 22 | Vote → queue → worker → database → live results |
 | Images | GitHub Container Registry | Tagged with the source commit, built manually today |

@@ -10,16 +10,28 @@ Read this before starting. The platform is not reproducible from `terraform appl
 
 | Step | Why it is manual |
 |---|---|
-| Gateway API CRD installation | Applied with `kubectl`. **The version was not recorded.** |
-| Traefik installation | Helm release. Chart `41.7.1` per a comment in the values file. The install command was not recorded. |
-| cert-manager installation | Helm release. **Chart version was not recorded.** |
+| Gateway API CRD installation | Applied with `kubectl`. Version recorded below. |
+| Traefik installation | Helm release. Chart and values recorded below; the original install command was not captured and is reconstructed. |
+| cert-manager installation | Helm release from an OCI registry. Chart and source recorded below. |
 | `postgres-credentials` Secret | Created by the operator. Deliberately never in Git. |
 | Traefik subnet IDs | Hardcoded in `k8s/platform/traefik/values-public.yaml`. New account means new IDs. |
-| Route 53 alias target | The NLB hostname is hardcoded in `infra/terraform/iam/dns-demo.tf`. Kubernetes generates it, so it cannot be known before Traefik is installed. |
+| Route 53 alias target | The NLB hostname is hardcoded in `infra/terraform/iam/dns-demo.tf`. Kubernetes generates it, so it cannot be known before Traefik is installed. Two-stage procedure below. |
 | Route 53 hosted zone | Pre-existing. Not created by this project. |
 | Operator IP allowlist | `api_public_access_cidrs` has no default and must be supplied. |
 
-Recording the three chart and CRD versions is scope item 05-B in [../blocks/05-gitops.md](../blocks/05-gitops.md). Until that is done, a rebuild requires choosing versions, and the result will not be identical to the current deployment.
+### Platform component versions
+
+Taken from the installation history of the deployed cluster. These are the versions that produced the running system.
+
+| Component | Version | Source |
+|---|---|---|
+| Gateway API CRDs | **`v1.6.1`**, Standard channel | `github.com/kubernetes-sigs/gateway-api` release manifest |
+| cert-manager | chart **`v1.21.2`** | **`oci://quay.io/jetstack/charts/cert-manager`** |
+| Traefik | chart **`41.7.1`** | `https://traefik.github.io/charts` |
+
+Pin these on a rebuild. Re-verification commands against a running cluster are given in each step below and collected in [verify.md](verify.md); use them if the cluster has been upgraded since this was written.
+
+These three versions still live outside Terraform and outside any manifest. Keeping them recorded and verified is scope item 05-B in [../blocks/05-gitops.md](../blocks/05-gitops.md).
 
 ## Operator input required
 
@@ -98,7 +110,19 @@ terraform apply -var-file=../dev.tfvars
 
 cd ../iam
 terraform init
-terraform apply                      # variables have defaults
+# Stage A only. See "The iam root is applied in two stages" below.
+terraform apply \
+  -target=aws_iam_role.eks_cluster \
+  -target=aws_iam_role_policy_attachment.eks_cluster \
+  -target=aws_iam_role.eks_node \
+  -target=aws_iam_role_policy_attachment.eks_node_worker \
+  -target=aws_iam_role_policy_attachment.eks_node_ecr \
+  -target=aws_iam_role_policy_attachment.eks_node_cni \
+  -target=aws_iam_role.ebs_csi \
+  -target=aws_iam_role_policy_attachment.ebs_csi \
+  -target=aws_iam_role.cert_manager \
+  -target=aws_iam_policy.cert_manager_route53 \
+  -target=aws_iam_role_policy_attachment.cert_manager_route53
 
 cd ../eks
 terraform init
@@ -117,13 +141,73 @@ What each root creates:
 | `iam` | EKS cluster role, node role with worker, ECR-pull and CNI policies, EBS CSI role, cert-manager role with the least-privilege Route 53 policy, **and the Route 53 A record** |
 | `eks` | Cluster 1.36, `vpc-cni`, `kube-proxy`, `coredns`, `eks-pod-identity-agent`, `aws-ebs-csi-driver` with a Pod Identity association, the managed node group, and the cert-manager Pod Identity association |
 
-### A circular dependency to expect
+### The iam root is applied in two stages
 
-`iam/dns-demo.tf` creates a Route 53 alias pointing at an NLB hostname that does not exist yet, because Kubernetes creates the NLB in step 7. On a clean build, either comment that resource out for the first apply and re-apply after step 7, or accept that the first apply fails on it.
+`infra/terraform/iam/` contains two unrelated groups of resources:
 
-This is the Terraform-versus-Kubernetes ownership problem described in [../lessons.md](../lessons.md). Resolving it properly means `external-dns` or an accepted manual step, and it is deferred.
+| Group | Resources | Depends on |
+|---|---|---|
+| IAM roles and policies | `aws_iam_role.eks_cluster`, `aws_iam_role.eks_node`, `aws_iam_role.ebs_csi`, `aws_iam_role.cert_manager`, their policies and attachments | nothing |
+| The public DNS record | `aws_route53_record.wtt_demo` in `dns-demo.tf` | **a Network Load Balancer that Kubernetes creates in step 7** |
 
-Similarly, `eks/cert-manager-identity.tf` names the service account `cert-manager` in namespace `cert-manager`, which does not exist until step 6. A Pod Identity association can be created before its service account exists and simply starts working when it appears, so no revisit is needed there.
+The record's `alias.name` is the NLB hostname, written in as a string literal. On a clean build that hostname does not exist yet, so the record cannot be created before Traefik is installed. The `eks` root, meanwhile, needs the IAM roles immediately.
+
+The procedure is therefore deterministic and explicit, not trial and error. **Do not run an apply that is expected to fail.**
+
+**Stage A — before the `eks` root.** Apply the eleven IAM resources by address, as shown in the commands above. `-target` is the supported mechanism for a partial apply and it creates exactly those resources plus their `data` dependencies. Terraform prints a warning that the apply was targeted and the state may be incomplete; that is expected here and is not an error.
+
+Confirm Stage A produced the three outputs the `eks` root reads:
+
+```bash
+cd infra/terraform/iam
+terraform output eks_cluster_role_arn
+terraform output eks_node_role_arn
+terraform output ebs_csi_role_arn
+```
+
+All three must return an ARN. If any is empty, the `eks` root will fail on its `terraform_remote_state` lookup.
+
+**Stage B — after step 7, once the NLB exists.** Read the hostname, write it into `dns-demo.tf`, then run a full untargeted apply, which converges the root and creates only the record:
+
+```bash
+NLB=$(kubectl -n traefik get svc traefik \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+echo "$NLB"                       # must be non-empty before continuing
+
+# Edit infra/terraform/iam/dns-demo.tf and set alias.name to that value.
+cd infra/terraform/iam
+terraform plan                    # expect exactly one resource to add
+terraform apply
+```
+
+Stage B is step 12 of this document. The `plan` must show one resource to add and nothing to change or destroy; anything else means Stage A was incomplete.
+
+### The remaining manual dependency
+
+Stage B cannot be automated with the code as it stands. Three facts combine:
+
+1. The NLB is created by Kubernetes, in response to the Traefik `Service` of type `LoadBalancer`. Terraform neither creates it nor can compute its hostname.
+2. `dns-demo.tf` stores that hostname as a literal, so there is no variable to pass and no data source consulted at apply time.
+3. The hostname is generated per load balancer, so it changes whenever the Traefik `Service` is recreated.
+
+The consequences an operator must know:
+
+- A clean rebuild requires a human to copy one value from `kubectl` into a `.tf` file between step 7 and step 12.
+- If the Traefik `Service` or Helm release is ever recreated, the record silently points at a load balancer that no longer exists. `terraform plan` stays empty, because from Terraform's view nothing changed. The site is down and nothing reports it. Detection and recovery are in [troubleshoot.md](troubleshoot.md).
+- `terraform destroy` of the record is safe and is step 2 of [teardown.md](teardown.md).
+
+Two permanent fixes exist, both deferred because they change Terraform or Kubernetes and this documentation task does not:
+
+| Fix | Effect |
+|---|---|
+| Deploy `external-dns`, and let it maintain the record from the `Gateway` or `Service` | Moves DNS ownership to Kubernetes, where the load balancer already lives. Removes the manual step and the silent-breakage class entirely. |
+| Keep Terraform ownership, but replace the literal with a `data "aws_lb"` lookup filtered by tag, and gate the record behind a `count` variable | Keeps the record in Terraform. Still needs two stages, but Stage B becomes `-var=create_dns_record=true` with no file edit. |
+
+The first is the better answer, and it also removes the need for the record to live in the `iam` root at all. Tracked in [../decisions/0017-terraform-multi-root.md](../decisions/0017-terraform-multi-root.md) and [../roadmap.md](../roadmap.md#deferred-beyond-the-interview).
+
+### A dependency that needs no special handling
+
+`eks/cert-manager-identity.tf` creates a Pod Identity association naming the service account `cert-manager` in namespace `cert-manager`, which does not exist until step 6. This is safe: an association may be created before its service account exists and simply begins working when the service account appears. No staging is required.
 
 ## 4. Cluster access
 
@@ -140,35 +224,43 @@ Generated on demand. Never commit a kubeconfig.
 Must be installed before Traefik, which will not start its Gateway provider without them.
 
 ```bash
-# Substitute the version you intend to standardise on.
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/<VERSION>/standard-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/standard-install.yaml
 
 kubectl get crd | grep gateway.networking.k8s.io
 ```
 
-**The version used in the current deployment was not recorded.** Read it from the running cluster:
+Standard channel is sufficient. `HTTPRoute`, `Gateway` and `GatewayClass` are all in it; nothing here needs the experimental channel.
+
+Re-verify against a running cluster:
 
 ```bash
 kubectl get crd gateways.gateway.networking.k8s.io \
   -o jsonpath='{.metadata.annotations.gateway\.networking\.k8s\.io/bundle-version}{"\n"}'
 ```
 
-Standard channel is sufficient. `HTTPRoute`, `Gateway` and `GatewayClass` are all in it; nothing here needs the experimental channel.
+Expect `v1.6.1`. A mismatch means the cluster was upgraded after this document was written; record the new value here.
 
 ## 6. cert-manager — MANUAL
 
+Installed from the OCI registry, not from a classic Helm repository, so there is no `helm repo add` step:
+
 ```bash
-helm repo add jetstack https://charts.jetstack.io
-helm repo update
-helm install cert-manager jetstack/cert-manager \
+helm install cert-manager oci://quay.io/jetstack/charts/cert-manager \
   --namespace cert-manager --create-namespace \
-  --version <VERSION> \
+  --version v1.21.2 \
   --set crds.enabled=true
 
 kubectl -n cert-manager get pods     # controller, webhook, cainjector all Running
 ```
 
-**Chart version not recorded.** Read it from the cluster with `helm list -A`.
+Re-verify against a running cluster:
+
+```bash
+helm list -n cert-manager -o json | python3 -c \
+  'import json,sys; [print(r["name"], r["chart"], r["app_version"]) for r in json.load(sys.stdin)]'
+```
+
+Expect chart `cert-manager-v1.21.2`.
 
 The service account must be named `cert-manager` in namespace `cert-manager` to match the Pod Identity association created in step 3. That is the chart default.
 
@@ -198,7 +290,14 @@ helm install traefik traefik/traefik \
   -f k8s/platform/traefik/values-public.yaml
 ```
 
-Chart `41.7.1`, per the comment at the top of `values.yaml`. The install command itself was not recorded, so the command above is reconstructed from the values files that exist.
+Chart `41.7.1`, which matches the comment at the top of `values.yaml`. The original install command was not captured, so the command above is reconstructed from the two values files that exist in the repository. Re-verify:
+
+```bash
+helm list -n traefik -o json | python3 -c \
+  'import json,sys; [print(r["name"], r["chart"], r["app_version"]) for r in json.load(sys.stdin)]'
+```
+
+Expect chart `traefik-41.7.1`.
 
 `values.yaml` enables only the Gateway API provider, disables the Ingress and CRD providers, and creates a `GatewayClass` named `traefik` plus a `Gateway` named `traefik-gateway` with listeners `web:8000` HTTP and `websecure:8443` HTTPS. `values-public.yaml` switches the Service to `LoadBalancer` with NLB annotations.
 
@@ -284,20 +383,38 @@ Both issuers use a DNS-01 Route 53 solver with a `dnsNames` selector, authentica
 
 Certificates cover one name. There is no wildcard.
 
-## 12. Route 53 record
+## 12. Route 53 record — Stage B of the iam root
 
-Now that the NLB hostname from step 7 is known, update `infra/terraform/iam/dns-demo.tf` with it and apply:
+This completes the two-stage apply described in step 3. The NLB now exists, so its hostname is known and the record can be created.
+
+```bash
+NLB=$(kubectl -n traefik get svc traefik \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+echo "$NLB"                       # must be non-empty
+```
+
+Set `alias.name` in `infra/terraform/iam/dns-demo.tf` to that value, then run a full untargeted apply:
 
 ```bash
 cd infra/terraform/iam
+terraform plan                    # expect exactly 1 to add, 0 to change, 0 to destroy
 terraform apply
 ```
+
+If the plan proposes anything other than adding `aws_route53_record.wtt_demo`, Stage A was incomplete. Re-read step 3 rather than approving the plan.
 
 ```bash
 dig +short wtt-demo.syachin.de                   # two addresses, one per zone
 ```
 
-The alias also needs the NLB's canonical hosted zone ID, which is region-specific. `Z1UDT6IFJ4EJM` is the value for NLBs in `eu-north-1`.
+The alias also needs the NLB's canonical hosted zone ID, which is region-specific and is a property of the load balancer rather than of this project. `Z1UDT6IFJ4EJM` is the value for NLBs in `eu-north-1`. For another region, read it from the load balancer:
+
+```bash
+aws elbv2 describe-load-balancers --region "$AWS_REGION" \
+  --query "LoadBalancers[?DNSName=='$NLB'].CanonicalHostedZoneId" --output text
+```
+
+From this point the record is a literal that Terraform will not update by itself. Whenever the Traefik `Service` is recreated, step 12 must be repeated; see the manual dependency note in step 3 and the detection procedure in [troubleshoot.md](troubleshoot.md).
 
 ## 13. Application
 
@@ -373,7 +490,7 @@ grep -rn 'wtt-demo\.syachin\.de' infra/ k8s/
 
 | Gap | Effect | Owner |
 |---|---|---|
-| Three chart and CRD versions unrecorded | A rebuild will not be version-identical | Block 05, item 05-B |
+| Three chart and CRD versions pinned in prose, not in code | A rebuild is version-identical only if the operator follows this document; nothing enforces it | Block 05, item 05-B |
 | Route 53 alias depends on a Kubernetes-generated hostname | The first apply of the `iam` root cannot succeed on a clean build | Deferred |
 | Subnet IDs hardcoded in Traefik values | Must be edited for a new account | Deferred |
 | The Secret is manual | A rebuild stops until an operator creates it | [ADR 0020](../decisions/0020-manual-postgres-secret.md) |
