@@ -3,5 +3,5 @@ kind: ConfigMap
 metadata:
   name: release-demo
 data:
-  version: "v1"
+  version: "v2"
   message: "Delivered through Argo CD"
