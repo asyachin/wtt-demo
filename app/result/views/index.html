@@ -1,43 +1,116 @@
+
 <!DOCTYPE html>
-<html ng-app="catsvsdogs">
-  <head>
-    <meta charset="utf-8">
-    <title>Cats vs Dogs -- Result</title>
-    <base href="./">
-    <meta name = "viewport" content = "width=device-width, initial-scale = 1.0">
-    <meta name="keywords" content="docker-compose, docker, stack">
-    <meta name="author" content="Docker">
-    <link rel='stylesheet' href='stylesheets/style.css' />
-  </head>
-  <body ng-controller="statsCtrl" >
-     <div id="background-stats">
-       <div id="background-stats-1">
-       </div><!--
-      --><div id="background-stats-2">
-      </div>
-    </div>
-    <div id="content-container">
-      <div id="content-container-center">
-        <div id="choice">
-          <div class="choice cats">
-            <div class="label">Cats</div>
-            <div class="stat">{{aPercent | number:1}}%</div>
-          </div>
-          <div class="divider"></div>
-          <div class="choice dogs">
-            <div class="label">Dogs</div>
-            <div class="stat">{{bPercent | number:1}}%</div>
-          </div>
+<html lang="en" ng-app="catsvsdogs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <meta
+    name="description"
+    content="Live results for the Cats vs Dogs vote."
+  >
+
+  <title>Cats vs Dogs | Live Results</title>
+
+  <base href="./">
+  <link rel="stylesheet" href="stylesheets/style.css">
+</head>
+
+<body ng-controller="statsCtrl">
+  <main class="page">
+    <section class="results-card" aria-labelledby="page-title">
+
+      <header class="intro">
+        <div class="eyebrow">
+          <span class="eyebrow-dot" aria-hidden="true"></span>
+          THE GREAT PET DEBATE
         </div>
-      </div>
-    </div>
-    <div id="result">
-      <span ng-if="total == 0">No votes yet</span>
-      <span ng-if="total == 1">{{total}} vote</span>
-      <span ng-if="total >= 2">{{total}} votes</span>
-    </div>
-    <script src="socket.io.js"></script>
-    <script src="angular.min.js"></script>
-    <script src="app.js"></script>
-  </body>
+
+        <h1 id="page-title">
+          <span class="cats-word">Cats</span>
+          <span class="vs-word">vs</span>
+          <span class="dogs-word">Dogs</span>
+        </h1>
+
+        <p class="subtitle">Live voting results</p>
+      </header>
+
+      <section class="stats" aria-label="Voting percentages">
+
+        <div class="stat-card cats">
+          <span class="stat-icon" aria-hidden="true">🐱</span>
+          <span class="stat-label">CATS</span>
+
+          <strong class="stat-value">
+            {{aPercent | number:1}}%
+          </strong>
+        </div>
+
+        <div class="stat-card dogs">
+          <span class="stat-icon" aria-hidden="true">🐶</span>
+          <span class="stat-label">DOGS</span>
+
+          <strong class="stat-value">
+            {{bPercent | number:1}}%
+          </strong>
+        </div>
+
+      </section>
+
+      <section class="chart-section" aria-label="Vote distribution">
+        <div id="background-stats" class="chart-track">
+          <div
+            id="background-stats-1"
+            class="chart-segment cats-segment"
+          ></div>
+          <div
+            id="background-stats-2"
+            class="chart-segment dogs-segment"
+          ></div>
+        </div>
+
+        <div class="chart-legend">
+          <span>
+            <span class="legend-dot cats-dot"></span>
+            Cats
+          </span>
+
+          <span>
+            Dogs
+            <span class="legend-dot dogs-dot"></span>
+          </span>
+        </div>
+      </section>
+
+      <section id="result" class="vote-summary" aria-live="polite">
+        <strong class="vote-total">
+          <span ng-if="total == 0">No votes yet</span>
+          <span ng-if="total == 1">{{total}} vote</span>
+          <span ng-if="total >= 2">{{total}} votes</span>
+        </strong>
+
+        <p class="live-caption">
+          <span class="live-dot" aria-hidden="true"></span>
+          Updates in real time
+        </p>
+      </section>
+
+      <a class="back-link" href="/">
+        <span aria-hidden="true">←</span>
+        Back to voting
+      </a>
+
+      <footer class="footer">
+        WTT CampusOne
+        <span aria-hidden="true">·</span>
+        Every vote counts
+      </footer>
+
+    </section>
+  </main>
+
+  <script src="socket.io.js"></script>
+  <script src="angular.min.js"></script>
+  <script src="app.js"></script>
+</body>
 </html>
