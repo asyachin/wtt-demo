@@ -9,9 +9,6 @@ spec:
   parentRefs:
     - name: traefik-gateway
       namespace: traefik
-      sectionName: web
-    - name: traefik-gateway
-      namespace: traefik
       sectionName: websecure
   rules:
     - matches:
@@ -31,9 +28,6 @@ spec:
   hostnames:
     - wtt-demo.syachin.de
   parentRefs:
-    - name: traefik-gateway
-      namespace: traefik
-      sectionName: web
     - name: traefik-gateway
       namespace: traefik
       sectionName: websecure
