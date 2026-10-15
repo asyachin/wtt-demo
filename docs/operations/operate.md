@@ -72,9 +72,10 @@ Expected to fail today, listed so their absence is not read as success. [Block 0
 ```bash
 curl -sSI https://$HOST/ | grep -iE 'strict-transport|x-frame|x-content|referrer-policy'
 curl -sSI https://$HOST/ | grep -i '^server:'
+curl -sSI https://$HOST/result/ | grep -iE '^server:|^x-powered-by:'
 ```
 
-Verified 15 Oct 2026: no security header is present, and `server: gunicorn` is disclosed.
+Verified 15 Oct 2026: no security header is present on either page. `vote` discloses `server: gunicorn`; `result` discloses `x-powered-by: Express`. Both are framework fingerprints Block 04's header work should also strip.
 
 ---
 
@@ -128,7 +129,7 @@ kubectl get pv "$PV" -o custom-columns=\
 'NAME:.metadata.name,SIZE:.spec.capacity.storage,RECLAIM:.spec.persistentVolumeReclaimPolicy,EBS:.spec.csi.volumeHandle'
 ```
 
-Expect a bound 5 GiB claim. **Expect `RECLAIM` to read `Delete`** — that is the data-loss risk owned by [Block 06](../roadmap.md#next-block).
+Expect a bound 5 GiB claim. **Expect `RECLAIM` to read `Retain`** as of 15 Oct 2026 — the live PersistentVolume was patched by hand that day. This does **not** mean the risk is closed: `k8s/base/storage/gp3.yaml` in Git still sets `reclaimPolicy: Delete`, so a future volume (after a node or volume loss, not just a claim deletion) would revert to `Delete`. If this command ever reports `Delete` again, either the live patch was lost or a new volume was provisioned — check which, and see [Block 06](../roadmap.md#next-block).
 
 ### Gateway and routes
 
@@ -465,4 +466,5 @@ Expect about 0.35 USD per hour. The usual surprise is a resource left by a parti
 | Single replica everywhere | No redundancy for Traefik or PostgreSQL |
 | Argo CD manages Deployments and Services only | Routing and data services still need manual `kubectl apply` |
 | Hardcoded load balancer hostname in Terraform | A silent total outage is possible with nothing reporting it |
-| Reclaim policy `Delete` | A mistaken `kubectl delete pvc` destroys all data |
+| Reclaim policy is `Retain` on the live volume but `Delete` in Git | Today's claim is protected; a replacement volume would not be, until `k8s/base/storage/gp3.yaml` is corrected and committed |
+| `vote` discloses `server: gunicorn`, `result` discloses `x-powered-by: Express` | Framework fingerprinting. Same fix as the missing security headers. |

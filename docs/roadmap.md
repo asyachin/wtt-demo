@@ -16,7 +16,7 @@ Releases and their commits are in [../CHANGELOG.md](../CHANGELOG.md). Deviations
 | 03 Public HTTPS | cert-manager, least-privilege DNS-01, public load balancer, Route 53 | 02 | `CLOSED` | v0.4.0 `71f0e0a`, fix v0.4.1 `6ea8755` |
 | 04 Demo quality gate | Browser-correct behaviour: no blocked content, HTTPS enforced, security headers, repaired test | 03 | **`IN PROGRESS`** | v0.4.2, v0.5.0, v0.8.0 — headers outstanding |
 | 05 GitOps with Argo CD | Adopt running workloads without disruption, prove rollback by Git | 04 partial | `CLOSED` | v0.6.0, `8ac5789` |
-| 06 Data durability | Protect the volume from accidental deletion, then a tested backup and restore | 02 | `PLANNED` | — |
+| 06 Data durability | Protect the volume from accidental deletion, then a tested backup and restore | 02 | **`IN PROGRESS`** | 06-A applied live, 15 Oct 2026 |
 | 07 CI pipeline | Tests, image build, vulnerability gate, publish to GHCR | 05 | `CLOSED` | v0.7.0, PR #1 |
 | 08 Observability | Metrics and alerting, scoped to what is genuinely useful at this size | 05 | `OPTIONAL` | — |
 | 09 Security hardening | Non-root containers, Pod Security Standards, NetworkPolicy, pinned dependencies, health endpoints | 04, 07 | `OPTIONAL` | — |
@@ -30,27 +30,44 @@ Two blocks did not follow the planned order, and that is recorded rather than sm
 
 ## Next block
 
-**Block 06 — Data durability.** It is the only `PLANNED` block that addresses a risk which is both live and irreversible.
+**Block 06 — Data durability.** The only block addressing a risk that is both live and irreversible. Partially done.
 
-| Step | Action | Effort |
+| Step | Action | Status |
 |---|---|---|
-| 06-A | Patch the existing PersistentVolume reclaim policy to `Retain`, and change the StorageClass so future volumes inherit it | One command, no downtime, reversible |
-| 06-B | A scheduled `pg_dump` to S3, using Pod Identity so no credential is stored | — |
-| 06-C | A restore script, and a restore actually performed with row counts compared | — |
-| 06-D | Retention lifecycle, and a check that the latest backup is recent and non-empty | — |
+| 06-A | Patch the existing PersistentVolume reclaim policy to `Retain`, and change the StorageClass so future volumes inherit it | **Half done** — see below |
+| 06-B | A scheduled `pg_dump` to S3, using Pod Identity so no credential is stored | Not started |
+| 06-C | A restore script, and a restore actually performed with row counts compared | Not started |
+| 06-D | Retention lifecycle, and a check that the latest backup is recent and non-empty | Not started |
 
-06-A is independently deliverable and worth doing before anything else:
+### 06-A — half done, and the remaining half matters
 
-```bash
-PV=$(kubectl -n vote-dev get pvc data-postgres-0 -o jsonpath='{.spec.volumeName}')
-kubectl get pv "$PV" -o jsonpath='{.spec.persistentVolumeReclaimPolicy}{"\n"}'   # expect Delete
-kubectl patch pv "$PV" -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
-kubectl get pv "$PV" -o jsonpath='{.spec.persistentVolumeReclaimPolicy}{"\n"}'   # expect Retain
+The existing volume was patched live on 15 October 2026, outside Git:
+
+```
+$ kubectl get pv -o custom-columns=NAME:.metadata.name,RECLAIM:.spec.persistentVolumeReclaimPolicy,STATUS:.status.phase,CLAIM:.spec.claimRef.name
+NAME                                       RECLAIM   STATUS   CLAIM
+pvc-ef9d36d4-0ff1-4a37-b047-b05735e5891f   Retain    Bound    data-postgres-0
 ```
 
-Editing the StorageClass does **not** change volumes that already exist: the reclaim policy is copied onto the PersistentVolume at provisioning time. Both the existing volume and the class must be changed. Doing only the class is a common and silent mistake.
+**Deleting the `data-postgres-0` claim today no longer destroys the volume.** That is the irreversible part of the risk, and it is closed.
 
-`Retain` is not a backup. It protects against deleting the claim and nothing else.
+**The StorageClass in Git still reads `Delete`:**
+
+```bash
+$ grep reclaimPolicy k8s/base/storage/gp3.yaml
+reclaimPolicy: Delete
+```
+
+This was always the trap this step called out: a `kubectl patch` on the live PersistentVolume protects that one volume, but the policy is copied onto a volume only at provisioning time, so it does **not** change what a future volume gets. If `postgres-0` is ever lost and PostgreSQL reprovisions, the replacement volume will again default to `Delete` until the manifest itself is corrected and re-applied:
+
+```yaml
+# k8s/base/storage/gp3.yaml
+reclaimPolicy: Retain
+```
+
+Until that commit lands, this step is half done: today's volume is protected by an unrecorded manual change; tomorrow's volume is not. Treat 06-A as open until the manifest and the cluster agree.
+
+`Retain` was never a backup on its own. It protects only against deleting the claim. 06-B through 06-D remain entirely open.
 
 ### Acceptance criteria for Block 06
 

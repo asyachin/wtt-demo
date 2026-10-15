@@ -14,9 +14,12 @@ Every version links to the merge commit or pull request that delivered it. Deliv
 - Consolidated documentation set: architecture, roadmap, process, operations and decisions, replacing the pre-implementation plan.
 - This changelog, and retroactive version tags for the existing history.
 
+### Fixed
+- The PersistentVolume behind `data-postgres-0` was patched live to `reclaimPolicy: Retain`, 15 October 2026, so a claim deletion no longer destroys the volume. Applied directly with `kubectl patch`, **not yet committed**: `k8s/base/storage/gp3.yaml` still declares `reclaimPolicy: Delete`, so a future volume would not inherit the fix. Block 06, step 06-A, half done.
+
 ### Known gaps
-- Browser security headers are not set. Block 04.
-- No PostgreSQL backup, and the volume reclaim policy is `Delete`. Block 06.
+- Browser security headers are not set on either page, and `vote` discloses `server: gunicorn` while `result` discloses `x-powered-by: Express`. Block 04.
+- No PostgreSQL backup. The committed reclaim policy is still `Delete`; only the running volume has been protected by hand. Block 06.
 - Argo CD manages only the application Deployments and Services. Routing, data services, cert-manager and Traefik remain manual.
 
 ## [0.8.0] — 2026-10-15

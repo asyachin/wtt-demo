@@ -101,7 +101,7 @@ Full detail, including the identity model, ownership boundaries and cost: [docs/
 | CI: tests, image build, Trivy CRITICAL gate, publish to GHCR | Implemented |
 | Versioned releases through pull requests | Implemented |
 | Browser security headers | **Not implemented** |
-| PostgreSQL backup and restore | **Not implemented.** Volume reclaim policy is `Delete`, so data loss is possible and irreversible. |
+| PostgreSQL backup and restore | **Not implemented.** The running volume was patched live to `Retain` (15 Oct 2026), but the committed StorageClass still says `Delete`, so a replacement volume would not inherit the fix, and there is no backup regardless. |
 | Argo CD managing HTTPRoutes, data services, cert-manager, Traefik | Not implemented. Those remain manual. |
 | Monitoring, metrics, alerting | Not implemented |
 | Non-root containers, Pod Security Standards, NetworkPolicy | Not implemented |

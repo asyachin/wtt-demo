@@ -143,8 +143,12 @@ GET  https://…/                      → 200
 GET  https://…/result/               → 200
 GET  https://…/result/app.js         → 200
 response headers                     → no HSTS, no X-Frame-Options,
-                                        no X-Content-Type-Options; Server: gunicorn
+                                        no X-Content-Type-Options;
+                                        vote discloses "server: gunicorn",
+                                        result discloses "x-powered-by: Express"
 ```
+
+Both disclosures were confirmed again on 15 Oct 2026 (`curl -sSI` against `/` and `/result/`). Neither header is a vulnerability on its own, but both tell a visitor exactly which framework to target, and both should be stripped by the same `ResponseHeaderModifier` work in Block 04.
 
 The redirect includes an explicit `:443` because the route sets `port: 443`. Functionally correct and cosmetically untidy; omitting the port would let it be inferred from the scheme.
 
@@ -152,7 +156,7 @@ The redirect includes an explicit `:443` because the route sets `port: 443`. Fun
 
 | Gap | Owner |
 |---|---|
-| No browser security headers, and the `Server` banner is disclosed | [Block 04](roadmap.md) |
+| No browser security headers, and the `Server` and `X-Powered-By` banners are disclosed on `vote` and `result` respectively | [Block 04](roadmap.md) |
 | Proxy Protocol v2 not configured, so Traefik logs load balancer addresses rather than client addresses. Enabling it requires a coordinated change on both the Service annotation and the entrypoint; one side alone breaks all traffic. | Deferred |
 | Traefik runs one replica with no PodDisruptionBudget. Its loss is a total outage. | Deferred |
 
@@ -177,19 +181,23 @@ Because the challenge is DNS-01 rather than HTTP-01, issuance and renewal never 
 
 | Property | Value |
 |---|---|
-| StorageClass | `gp3`, `ebs.csi.aws.com`, encrypted, `allowVolumeExpansion`, `WaitForFirstConsumer` |
-| Reclaim policy | **`Delete`** |
+| StorageClass, in Git | `gp3`, `ebs.csi.aws.com`, encrypted, `allowVolumeExpansion`, `WaitForFirstConsumer`, **`reclaimPolicy: Delete`** |
+| The running PersistentVolume | `persistentVolumeReclaimPolicy: Retain` — patched live on 15 October 2026, **not committed** |
 | PostgreSQL | StatefulSet, 1 replica, `postgres:17.11-alpine`, 5 GiB claim |
 | Redis | Deployment, 1 replica, `redis:7.4.11-alpine`, `--appendonly no --save ""`, no volume |
 
 PostgreSQL survives a pod restart because the volume detaches and reattaches to the rescheduled pod; operator-verified in Block 02. `WaitForFirstConsumer` ensures the volume is created in the zone where the pod is actually scheduled. A volume exists in exactly one availability zone, so the pod can only ever run there.
 
-**Two serious gaps:**
+**Reclaim policy: half fixed, half not.** The committed StorageClass still reads `Delete`, but the live PersistentVolume behind `data-postgres-0` has been patched directly to `Retain`:
 
-- `reclaimPolicy: Delete` means deleting the claim destroys the volume and all voting data. PVC deletion safety has not been established.
-- There is no backup. No dump, no snapshot schedule, no tested restore.
+```
+$ kubectl get pv -o custom-columns=NAME:.metadata.name,RECLAIM:.spec.persistentVolumeReclaimPolicy
+pvc-ef9d36d4-0ff1-4a37-b047-b05735e5891f   Retain
+```
 
-`Retain` would protect against accidental deletion but is not a backup: it does nothing about corruption, a bad migration, or deletion of the volume itself. Both are owned by [Block 06](roadmap.md).
+This protects today's volume: deleting the `data-postgres-0` claim now leaves the volume and the data intact. It does **not** protect a replacement volume, because the reclaim policy is copied from the StorageClass onto a PersistentVolume only at provisioning time. If this pod's volume is ever lost and PostgreSQL reprovisions, the new volume reverts to `Delete` until `k8s/base/storage/gp3.yaml` is corrected and re-applied. Cluster and Git currently disagree; see [Block 06](roadmap.md#next-block).
+
+**Still no backup.** No dump, no snapshot schedule, no tested restore. `Retain` is not a substitute: it does nothing about corruption, a bad migration, or deletion of the volume itself rather than the claim. Owned by [Block 06](roadmap.md#next-block).
 
 Redis is intentionally ephemeral. A restart loses votes in flight.
 
@@ -286,7 +294,8 @@ Assessed from the configuration. Not all have been exercised.
 | Node lost | Pods reschedule; PostgreSQL only within its volume's zone | Node group replaces the node | No |
 | Traefik Service recreated | New load balancer hostname; the Route 53 record still points at the old one; **silent total outage** | Update the literal in `iam/dns-demo.tf` and apply | No |
 | Certificate renewal fails | Expiry about 30 days later, then browsers refuse the site | No alerting exists | No |
-| PVC deleted | **Irreversible loss of all voting data** | None. No backup exists. | No |
+| `data-postgres-0` claim deleted today | The volume survives, patched to `Retain` live on 15 Oct 2026; data is not lost | Rebind a new claim to the released volume | **Yes**, `kubectl get pv` confirms `Retain`, 15 Oct 2026 |
+| A replacement volume is provisioned (node or volume loss, not just the claim) | **Reverts to `Delete`**, because the StorageClass in Git was never updated. The next volume is unprotected. | None. No backup exists either way. | No |
 | Bad image released | Wrong behaviour in production | `git revert` the release commit; Argo CD syncs | **Yes**, `3f9d2a6` then `eac7c13` |
 | Vulnerable image | Never published | Trivy gate fails the build | **Yes**, version 0.7.1 |
 

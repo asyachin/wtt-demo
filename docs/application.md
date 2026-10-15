@@ -145,7 +145,7 @@ Verified by reading the source at `390a119`.
 
 | Gap | Effect |
 |---|---|
-| No PostgreSQL backup, and the volume reclaim policy is `Delete` | All voting data is lost irreversibly if the claim is deleted. [Block 06](roadmap.md#next-block). |
+| No PostgreSQL backup; the live volume was patched to `Retain` on 15 Oct 2026 but the StorageClass in Git still reads `Delete` | Today's claim deletion is survivable; a *replacement* volume (after a node or volume loss) would still be destroyable, and there is no backup either way. [Block 06](roadmap.md#next-block). |
 | Single replica for every workload | Any restart is a brief outage of that function |
 | No NetworkPolicy | `vote` can reach PostgreSQL directly although it has no reason to |
 | No PodDisruptionBudget | A node drain can take down Traefik and the application together |
