@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: wtt-demo
+  namespace: argocd
+spec:
+  sourceRepos:
+    - https://github.com/asyachin/wtt-demo.git
+  destinations:
+    - namespace: gitops-demo
+      server: https://kubernetes.default.svc
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitops-demo
+  namespace: argocd
+spec:
+  project: wtt-demo
+  source:
+    repoURL: https://github.com/asyachin/wtt-demo.git
+    targetRevision: dev
+    path: k8s/gitops/demo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitops-demo
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
